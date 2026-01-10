@@ -1,0 +1,10 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+  <div class="row">
+    <h1>Escala — {{ s.servico }} • {{ s.categoria }}</h1>
+    <a class="btn secondary" href="{{ url_for('scales.index', ano=s.ano, mes=s.mes) }}">Voltar</a>
+  </div>
+  <p class="muted">{{ s.ano }}/{{ "%02d"|format(s.mes) }} ({{ month_name(s.mes) }}) • Status: {{ s.status }}</p>
+
+  <iframe src="{{ url_for('scales.file', filename=s.filename) }}" title="Escala" style="width:100%; height:75vh; border:1px solid #ddd; border-radius:12px;"></iframe>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+  <h1>Relatório de abertura/leitura</h1>
+  <p class="muted">Mostra quem abriu, quando e quantas vezes (estrutura base).</p>
+
+  {% for d in docs %}
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-title">{{ d.titulo }} <span class="pill">{{ d.tipo }}</span></div>
+      <div class="muted">Setor: {{ d.setor or "—" }} • Status: {{ d.status }}</div>
+
+      {% set reads = reads_by_doc.get(d.id, []) %}
+      {% if reads %}
+        <table class="table" style="margin-top:10px;">
+          <thead><tr><th>User ID</th><th>1ª abertura</th><th>Última</th><th>Qtde</th></tr></thead>
+          <tbody>
+            {% for r in reads %}
+              <tr>
+                <td>{{ r.user_id }}</td>
+                <td>{{ r.first_opened_at }}</td>
+                <td>{{ r.last_opened_at }}</td>
+                <td>{{ r.open_count }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div class="muted" style="margin-top:8px;">Nenhuma abertura registrada.</div>
+      {% endif %}
+    </div>
+  {% endfor %}
+{% endblock %}

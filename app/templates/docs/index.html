@@ -1,0 +1,32 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+  <div class="row">
+    <h1>Documentos</h1>
+    {% if current_user.role in ['manager','admin'] %}
+      <a class="btn" href="{{ url_for('docs.upload') }}">Enviar documento</a>
+      <a class="btn secondary" href="{{ url_for('docs.report') }}">Relatório de leituras</a>
+    {% endif %}
+  </div>
+
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Título</th><th>Tipo</th><th>Setor</th><th>Status</th><th>Aberturas</th><th>Leitores</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in docs %}
+        {% set agg = reads_map.get(d.id, {'opens':0,'users':0}) %}
+        <tr>
+          <td>{{ d.titulo }}</td>
+          <td>{{ d.tipo }}</td>
+          <td>{{ d.setor or "-" }}</td>
+          <td>{{ d.status }}</td>
+          <td>{{ agg.opens }}</td>
+          <td>{{ agg.users }}</td>
+          <td><a class="btn small" href="{{ url_for('docs.view', doc_id=d.id) }}">Abrir</a></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

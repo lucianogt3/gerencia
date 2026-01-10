@@ -1,0 +1,30 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+  <h1>Novo documento</h1>
+  <form method="post" enctype="multipart/form-data">
+    {{ form.csrf_token }}
+    <div class="grid">
+      <div>
+        <label>Título</label>
+        {{ form.titulo(class_="input") }}
+      </div>
+      <div>
+        <label>Tipo</label>
+        {{ form.tipo(class_="input") }}
+      </div>
+      <div>
+        <label>Setor</label>
+        {{ form.setor(class_="input") }}
+      </div>
+      <div>
+        <label>Tags</label>
+        {{ form.tags(class_="input") }}
+      </div>
+      <div style="grid-column:1/-1;">
+        <label>Arquivo</label>
+        {{ form.arquivo(class_="input") }}
+      </div>
+    </div>
+    <button class="btn" type="submit">{{ form.submit.label.text }}</button>
+  </form>
+{% endblock %}

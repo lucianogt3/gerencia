@@ -1,0 +1,30 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+  <h1>Usuários pendentes</h1>
+  <table class="table">
+    <thead>
+      <tr><th>Nome</th><th>Matrícula</th><th>Setor</th><th>Turno</th><th>Status</th><th>Ações</th></tr>
+    </thead>
+    <tbody>
+      {% for u in pending %}
+        <tr>
+          <td>{{ u.nome }}</td>
+          <td>{{ u.matricula }}</td>
+          <td>{{ u.setor or "-" }}</td>
+          <td>{{ u.turno or "-" }}</td>
+          <td>{{ u.status }}</td>
+          <td class="actions">
+            <form method="post" action="{{ url_for('auth.approve_user', user_id=u.id) }}" style="display:inline;">
+              {{ csrf_token() }}
+              <button class="btn small" type="submit">Aprovar</button>
+            </form>
+            <form method="post" action="{{ url_for('auth.block_user', user_id=u.id) }}" style="display:inline;">
+              {{ csrf_token() }}
+              <button class="btn small danger" type="submit">Bloquear</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

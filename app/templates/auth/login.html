@@ -1,0 +1,13 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+  <h1>Entrar</h1>
+  <form method="post">
+    {{ form.csrf_token }}
+    <label>Matrícula ou E-mail</label>
+    {{ form.matricula_or_email(class_="input") }}
+    <label>Senha</label>
+    {{ form.password(class_="input") }}
+    <button class="btn" type="submit">{{ form.submit.label.text }}</button>
+  </form>
+  <p class="muted">Não tem acesso? <a href="{{ url_for('auth.register') }}">Solicitar cadastro</a></p>
+{% endblock %}

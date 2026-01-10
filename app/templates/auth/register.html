@@ -1,0 +1,38 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+  <h1>Solicitar acesso</h1>
+  <form method="post">
+    {{ form.csrf_token }}
+    <div class="grid">
+      <div>
+        <label>Matrícula/ID</label>
+        {{ form.matricula(class_="input") }}
+      </div>
+      <div>
+        <label>Nome</label>
+        {{ form.nome(class_="input") }}
+      </div>
+      <div>
+        <label>E-mail (opcional)</label>
+        {{ form.email(class_="input") }}
+      </div>
+      <div>
+        <label>Setor (opcional)</label>
+        {{ form.setor(class_="input") }}
+      </div>
+      <div>
+        <label>Turno (opcional)</label>
+        {{ form.turno(class_="input") }}
+      </div>
+      <div>
+        <label>Nascimento (opcional)</label>
+        {{ form.nascimento(class_="input") }}
+      </div>
+      <div style="grid-column: 1 / -1;">
+        <label>Senha</label>
+        {{ form.password(class_="input") }}
+      </div>
+    </div>
+    <button class="btn" type="submit">{{ form.submit.label.text }}</button>
+  </form>
+{% endblock %}

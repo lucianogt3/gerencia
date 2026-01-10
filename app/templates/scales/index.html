@@ -1,0 +1,39 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+  <div class="row">
+    <h1>Escalas</h1>
+    {% if current_user.role in ['manager','admin'] %}
+      <a class="btn" href="{{ url_for('scales.upload') }}">Publicar escala</a>
+    {% endif %}
+  </div>
+
+  <form class="filters" method="get">
+    <label>Ano</label><input class="input" type="number" name="ano" value="{{ ano }}">
+    <label>Mês</label><input class="input" type="number" min="1" max="12" name="mes" value="{{ mes }}">
+    <label>Categoria</label>
+    <select class="input" name="categoria">
+      <option value="" {% if not categoria %}selected{% endif %}>Todas</option>
+      <option value="Enfermagem" {% if categoria=='Enfermagem' %}selected{% endif %}>Enfermagem</option>
+      <option value="Medica" {% if categoria=='Medica' %}selected{% endif %}>Médica</option>
+    </select>
+    <label>Serviço</label><input class="input" name="servico" value="{{ servico }}" placeholder="Cardio, Neuro...">
+    <button class="btn small" type="submit">Filtrar</button>
+  </form>
+
+  <table class="table">
+    <thead>
+      <tr><th>Serviço</th><th>Categoria</th><th>Ano/Mês</th><th>Status</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for s in scales %}
+        <tr>
+          <td>{{ s.servico }}</td>
+          <td>{{ s.categoria }}</td>
+          <td>{{ s.ano }}/{{ "%02d"|format(s.mes) }} ({{ month_name(s.mes) }})</td>
+          <td>{{ s.status }}</td>
+          <td><a class="btn small" href="{{ url_for('scales.view', scale_id=s.id) }}">Ver</a></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

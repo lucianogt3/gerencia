@@ -1,0 +1,16 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+  <h1>Publicar escala</h1>
+  <form method="post" enctype="multipart/form-data">
+    {{ form.csrf_token }}
+    <div class="grid">
+      <div><label>Categoria</label>{{ form.categoria(class_="input") }}</div>
+      <div><label>Serviço</label>{{ form.servico(class_="input") }}</div>
+      <div><label>Setor</label>{{ form.setor(class_="input") }}</div>
+      <div><label>Ano</label>{{ form.ano(class_="input") }}</div>
+      <div><label>Mês</label>{{ form.mes(class_="input") }}</div>
+      <div style="grid-column:1/-1;"><label>Arquivo</label>{{ form.arquivo(class_="input") }}</div>
+    </div>
+    <button class="btn" type="submit">{{ form.submit.label.text }}</button>
+  </form>
+{% endblock %}

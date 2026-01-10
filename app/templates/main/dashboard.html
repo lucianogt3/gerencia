@@ -1,0 +1,43 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+  <h1>Painel</h1>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-title">Meu ID/Matrícula</div>
+      <div class="card-value">{{ current_user.matricula }}</div>
+      <div class="muted">{{ current_user.nome }} • {{ current_user.setor or "—" }} • {{ current_user.turno or "—" }}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Acesso</div>
+      <div class="card-value">{{ current_user.role }}</div>
+      <div class="muted">Status: {{ current_user.status }}</div>
+    </div>
+  </div>
+
+  <h2>Avisos</h2>
+  {% if announcements %}
+    <ul class="list">
+      {% for a in announcements %}
+        <li>
+          <strong>[{{ a.tipo|upper }}]</strong> {{ a.title }}
+          {% if a.setor %}<span class="pill">{{ a.setor }}</span>{% endif %}
+          <div class="muted">{{ a.body or "" }}</div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">Nenhum aviso ainda.</p>
+  {% endif %}
+
+  <h2>Aniversariantes do mês</h2>
+  {% if aniversariantes %}
+    <ul class="list">
+      {% for u in aniversariantes %}
+        <li>{{ u.nascimento.strftime('%d/%m') }} — {{ u.nome }} {% if u.setor %}<span class="pill">{{ u.setor }}</span>{% endif %}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">Nenhum aniversariante cadastrado neste mês.</p>
+  {% endif %}
+{% endblock %}
