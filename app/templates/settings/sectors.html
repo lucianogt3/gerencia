@@ -1,0 +1,48 @@
+﻿{% extends "layouts/base.html" %}
+{% block content %}
+  <div class="row">
+    <h1>Configurações • Setores</h1>
+  </div>
+
+  <form class="filters" method="get">
+    <label>Buscar</label>
+    <input class="input" name="q" value="{{ q }}" placeholder="Nome do setor...">
+    <button class="btn small" type="submit">Filtrar</button>
+  </form>
+
+  <div class="card" style="margin-top:12px;">
+    <form method="post" action="{{ url_for('settings.sectors_create') }}" class="row" style="gap:10px; align-items:end;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div style="flex:1;">
+        <label>Nome do setor</label>
+        <input class="input" name="name" placeholder="Ex: UTI 1" required>
+      </div>
+      <button class="btn" type="submit">Criar setor</button>
+    </form>
+  </div>
+
+  <table class="table" style="margin-top:12px;">
+    <thead>
+      <tr><th>Setor</th><th>Status</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for s in sectors %}
+        <tr>
+          <td>{{ s.name }}</td>
+          <td>{{ "Ativo" if s.active else "Inativo" }}</td>
+          <td>
+            <form method="post" action="{{ url_for('settings.sectors_toggle', sector_id=s.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn small" type="submit">
+                {{ "Desativar" if s.active else "Ativar" }}
+              </button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}
+
+
+

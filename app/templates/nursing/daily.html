@@ -1,0 +1,18 @@
+﻿{% extends "layouts/base.html" %}
+{% block content %}
+<h1>Escala Diária</h1>
+
+<div class="card">
+  <div class="muted">Data: {{ today }}</div>
+  <div class="muted">Turno: {{ shift }}</div>
+  <div class="muted">Setor: {{ sector_id or "—" }}</div>
+</div>
+
+<div id="daily-root" class="card">
+  <p>Interface diária (consome /api/nursing/daily).</p>
+</div>
+{% endblock %}
+
+
+
+

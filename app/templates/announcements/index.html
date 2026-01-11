@@ -1,0 +1,19 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+  {% if current_user.role in ["manager","admin"] %}
+    <div style="margin-bottom:12px;">
+      <a class="btn" href="{{ url_for('announcements.new') }}">+ Novo aviso</a>
+    </div>
+  {% endif %}
+
+  <div style="display:grid; gap:10px;">
+    {% for a in items %}
+      <a class="card" style="text-decoration:none; color:inherit;"
+         href="{{ url_for('announcements.detail', announcement_id=a.id) }}">
+        <div style="font-weight:900;">[{{ a.tipo|upper }}] {{ a.title }}</div>
+        {% if a.setor %}<div class="muted">Setor: {{ a.setor }}</div>{% endif %}
+        {% if a.body %}<div class="muted">{{ a.body }}</div>{% endif %}
+      </a>
+    {% endfor %}
+  </div>
+{% endblock %}

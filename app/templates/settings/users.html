@@ -1,0 +1,100 @@
+﻿{% extends "layouts/base.html" %}
+
+{% block content %}
+  <div class="row">
+    <h1>Configurações • Colaboradores</h1>
+  </div>
+
+  <form class="filters" method="get">
+    <label>Buscar</label>
+    <input class="input" name="q" value="{{ q }}" placeholder="Nome, e-mail ou matrícula...">
+
+    <label>Role</label>
+    <select class="input" name="role">
+      <option value="" {% if not role %}selected{% endif %}>Todos</option>
+      <option value="staff" {% if role == 'staff' %}selected{% endif %}>Staff</option>
+      <option value="nurse" {% if role == 'nurse' %}selected{% endif %}>Enfermeiro</option>
+      <option value="manager" {% if role == 'manager' %}selected{% endif %}>Gerência</option>
+      <option value="admin" {% if role == 'admin' %}selected{% endif %}>Admin</option>
+    </select>
+
+    <label>Status</label>
+    <select class="input" name="status">
+      <option value="" {% if not status %}selected{% endif %}>Todos</option>
+      <option value="active" {% if status == 'active' %}selected{% endif %}>Ativo</option>
+      <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Inativo</option>
+    </select>
+
+    <button class="btn small" type="submit">Filtrar</button>
+  </form>
+
+  <table class="table" style="margin-top:12px;">
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>Matrícula</th>
+        <th>Role</th>
+        <th>Setor</th>
+        <th>Turno</th>
+        <th>Status</th>
+        <th style="width: 420px;">Ações</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {% for u in users %}
+        <tr>
+          <td>{{ u.nome }}</td>
+          <td>{{ u.matricula }}</td>
+          <td>{{ u.role }}</td>
+          <td>{{ u.setor or "—" }}</td>
+          <td>{{ u.turno or "—" }}</td>
+          <td>{{ u.status }}</td>
+
+          <td>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <!-- Ativar/Desativar -->
+              <form method="post" action="{{ url_for('settings.users_toggle', user_id=u.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn small" type="submit">
+                  {{ "Desativar" if u.status == "active" else "Ativar" }}
+                </button>
+              </form>
+
+              <!-- Atualizar setor/turno/role -->
+              <form method="post"
+                    action="{{ url_for('settings.users_update', user_id=u.id) }}"
+                    style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <select class="input" name="setor" style="min-width: 160px;">
+                  <option value="">—</option>
+                  {% for s in sectors %}
+                    <option value="{{ s.name }}" {% if u.setor == s.name %}selected{% endif %}>
+                      {{ s.name }}
+                    </option>
+                  {% endfor %}
+                </select>
+
+                <select class="input" name="turno" style="width: 90px;">
+                  <option value="">—</option>
+                  <option value="D" {% if u.turno == 'D' %}selected{% endif %}>D</option>
+                  <option value="N" {% if u.turno == 'N' %}selected{% endif %}>N</option>
+                </select>
+
+                <select class="input" name="role" style="min-width: 130px;">
+                  <option value="staff" {% if u.role == 'staff' %}selected{% endif %}>staff</option>
+                  <option value="nurse" {% if u.role == 'nurse' %}selected{% endif %}>nurse</option>
+                  <option value="manager" {% if u.role == 'manager' %}selected{% endif %}>manager</option>
+                  <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>admin</option>
+                </select>
+
+                <button class="btn small" type="submit">Salvar</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

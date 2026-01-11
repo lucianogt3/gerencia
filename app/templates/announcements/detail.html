@@ -1,0 +1,44 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+  <div class="card">
+    <div class="card-title">[{{ a.tipo|upper }}] {% if a.setor %}{{ a.setor }} • {% endif %}Aviso</div>
+    <div class="card-value" style="font-size:18px;">{{ a.title }}</div>
+    {% if a.body %}<div class="muted" style="margin-top:8px;">{{ a.body }}</div>{% endif %}
+  </div>
+
+  {% if current_user.role in ["manager","admin"] %}
+    <div class="grid-2" style="margin-top:12px;">
+      <div class="card">
+        <div class="card-title">Leram</div>
+        {% if read_users %}
+          <div style="display:grid; gap:8px;">
+            {% for u, dt in read_users %}
+              <div class="card" style="padding:10px;">
+                <div style="font-weight:800;">{{ u.nome }}</div>
+                <div class="muted">{{ u.setor or "—" }} • {{ u.turno or "—" }} • {{ dt.strftime("%d/%m %H:%M") }}</div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="muted">Ninguém leu ainda.</div>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <div class="card-title">Não leram</div>
+        {% if unread_users %}
+          <div style="display:grid; gap:8px;">
+            {% for u in unread_users %}
+              <div class="card" style="padding:10px;">
+                <div style="font-weight:800;">{{ u.nome }}</div>
+                <div class="muted">{{ u.setor or "—" }} • {{ u.turno or "—" }}</div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="muted">Todos já leram ✅</div>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}
