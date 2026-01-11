@@ -18,7 +18,7 @@
         <a class="btn" href="{{ url_for('nursing_ui.daily_page') }}">Escala Diária</a>
 
         {% if current_user.role in ["manager","admin"] %}
-          <a class="btn secondary" href="{{ url_for('nursing_ui.monthly_page') }}">Escala Mensal</a>
+          <a class="btn secondary" href="{{ url_for('nursing_ui.year_view') }}">Escala Mensal</a>
           <a class="btn secondary" href="{{ url_for('settings.sectors') }}">Configurações</a>
         {% endif %}
 
@@ -126,7 +126,7 @@
 
           <div class="quick-actions">
   {% if current_user.role in ["manager","admin"] %}
-    <a class="qa" href="{{ url_for('nursing_ui.monthly_page') }}">
+    <a class="qa" href="{{ url_for('nursing_ui.year_view') }}">
       <div class="qa-emoji"><i data-lucide="calendar-range"></i></div>
       <div>
         <div class="qa-title">Escala Mensal</div>

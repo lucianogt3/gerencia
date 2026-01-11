@@ -1,24 +1,15 @@
-{% extends "layouts/base.html" %}
+﻿{% extends "layouts/base.html" %}
 {% block content %}
-  <div class="dash">
-    <div class="page-head">
-      <div class="page-head-left">
-        <h1>🚫 Acesso negado</h1>
-        <div class="muted">
-          Você não tem permissão para acessar esta página.
-        </div>
-      </div>
-    </div>
-
-    <div class="card" style="padding:16px;">
-      <p class="muted" style="margin:0;">
-        Se você acredita que isso é um erro, peça para a gerência liberar o seu acesso.
-      </p>
-
-      <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
-        <a class="btn" href="{{ url_for('main.dashboard') }}">Voltar ao painel</a>
-        <a class="btn" href="{{ url_for('auth.logout') }}">Sair</a>
-      </div>
+<div class="content">
+  <div class="page-head">
+    <div class="page-head-left">
+      <h1>403  Acesso negado</h1>
+      <div class="muted">Você não tem permissão para acessar esta página.</div>
     </div>
   </div>
+
+  <div class="card" style="padding:16px;">
+    <a class="btn" href="{{ url_for('main.dashboard') }}">Voltar ao painel</a>
+  </div>
+</div>
 {% endblock %}
