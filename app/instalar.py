@@ -1,4 +1,4 @@
-import os, textwrap, zipfile, json, re, datetime, pathlib, shutil, hashlib
+﻿import os, textwrap, zipfile, json, re, datetime, pathlib, shutil, hashlib
 base = "/mnt/data/nurse_manager_portal_patch"
 if os.path.exists(base):
     shutil.rmtree(base)
@@ -39,17 +39,17 @@ w("requirements.txt", textwrap.dedent("""\
 """))
 
 w("README_UPDATE.md", textwrap.dedent("""\
-    # Nurse Manager Portal — Patch (Escala, Folgas, Atestados, Alertas e Feedback)
+    # Nurse Manager Portal â€” Patch (Escala, Folgas, Atestados, Alertas e Feedback)
 
-    Este ZIP é um "patch" com arquivos **novos** e arquivos **atualizados** (substituir/overwrite),
+    Este ZIP Ã© um "patch" com arquivos **novos** e arquivos **atualizados** (substituir/overwrite),
     trazendo:
 
-    - Escala mensal por setor (gerência)
-    - Escala diária (enfermeiro) baseada na escala mensal
-    - Substituição / remanejamento / extra / folga (com regras)
-    - Registro de faltas e atestados (com aprovação do gestor)
+    - Escala mensal por setor (gerÃªncia)
+    - Escala Diária(enfermeiro) baseada na escala mensal
+    - SubstituiÃ§Ã£o / remanejamento / extra / folga (com regras)
+    - Registro de faltas e atestados (com aprovaÃ§Ã£o do gestor)
     - Alertas de folga (24h antes)
-    - Módulo de Solicitação / Elogio / Reclamação (Feedback)
+    - MÃ³dulo de SolicitaÃ§Ã£o / Elogio / ReclamaÃ§Ã£o (Feedback)
 
     ## Como aplicar (Windows / PowerShell)
 
@@ -58,16 +58,16 @@ w("README_UPDATE.md", textwrap.dedent("""\
          `C:\\Users\\LUCIANO\\Desktop\\nurse_manager_portal_backup`
 
     2) **Extrair este ZIP por cima do projeto**
-       - Extraia o conteúdo deste ZIP dentro de:
+       - Extraia o conteÃºdo deste ZIP dentro de:
          `C:\\Users\\LUCIANO\\Desktop\\nurse_manager_portal\\`
        - Permita substituir arquivos quando solicitado.
 
-    3) **Criar e ativar venv (se não existir)**
+    3) **Criar e ativar venv (se Não existir)**
        - Dentro da pasta do projeto:
          - `python -m venv .venv`
          - `.\.venv\\Scripts\\Activate.ps1`
 
-    4) **Instalar dependências**
+    4) **Instalar dependÃªncias**
        - `pip install -r requirements.txt`
 
     5) **Criar pastas instance/uploads**
@@ -85,10 +85,10 @@ w("README_UPDATE.md", textwrap.dedent("""\
     - Email: admin@portal.local
     - Senha: admin123
 
-    > Troque a senha depois no banco / tela de gestão (fica como pendência para próxima etapa).
+    > Troque a senha depois no banco / tela de gestÃ£o (fica como pendÃªncia para prÃ³xima etapa).
 
-    ## Observação
-    - O banco padrão é SQLite em `instance/app.db`.
+    ## ObservaÃ§Ã£o
+    - O banco padrÃ£o Ã© SQLite em `instance/app.db`.
     - O upload fica em `instance/uploads`.
 
 """))
@@ -220,7 +220,7 @@ w("app/models.py", textwrap.dedent("""\
 
 
     class AbsenceType(str, Enum):
-        FALTA_NJ = "FALTA_NJ"        # falta não justificada
+        FALTA_NJ = "FALTA_NJ"        # falta Não justificada
         FALTA_J = "FALTA_J"          # falta justificada manual
         ATESTADO = "ATESTADO"
 
@@ -281,7 +281,7 @@ w("app/models.py", textwrap.dedent("""\
 
 
     class MonthlySchedule(db.Model):
-        \"\"\"Escala mensal inserida pela gerência.\"\"\"
+        \"\"\"Escala mensal inserida pela gerÃªncia.\"\"\"
         id = db.Column(db.Integer, primary_key=True)
         sector_id = db.Column(db.Integer, db.ForeignKey("sector.id"), nullable=False)
         year = db.Column(db.Integer, nullable=False)
@@ -308,7 +308,7 @@ w("app/models.py", textwrap.dedent("""\
 
 
     class DailyShift(db.Model):
-        \"\"\"Plantão diário montado pelo enfermeiro, baseado no mensal.\"\"\"
+        \"\"\"PlantÃ£o diÃ¡rio montado pelo enfermeiro, baseado no mensal.\"\"\"
         id = db.Column(db.Integer, primary_key=True)
         sector_id = db.Column(db.Integer, db.ForeignKey("sector.id"), nullable=False)
         shift_date = db.Column(db.Date, nullable=False)
@@ -326,7 +326,7 @@ w("app/models.py", textwrap.dedent("""\
 
 
     class DailyPosition(db.Model):
-        \"\"\"Posições do dia (Enf, Tec1..Tec5 etc).\"\"\"
+        \"\"\"PosiÃ§Ãµes do dia (Enf, Tec1..Tec5 etc).\"\"\"
         id = db.Column(db.Integer, primary_key=True)
         daily_shift_id = db.Column(db.Integer, db.ForeignKey("daily_shift.id"), nullable=False)
         position_key = db.Column(db.String(40), nullable=False)  # ENF, TEC_1, TEC_2...
@@ -342,7 +342,7 @@ w("app/models.py", textwrap.dedent("""\
 
 
     class CoverageEvent(db.Model):
-        \"\"\"Substituição / remanejo / extra / folga ligada a uma posição diária.\"\"\"
+        \"\"\"SubstituiÃ§Ã£o / remanejo / extra / folga ligada a uma posiÃ§Ã£o diÃ¡ria.\"\"\"
         id = db.Column(db.Integer, primary_key=True)
         daily_position_id = db.Column(db.Integer, db.ForeignKey("daily_position.id"), nullable=False)
 
@@ -363,7 +363,7 @@ w("app/models.py", textwrap.dedent("""\
 
 
     class CertificateRequest(db.Model):
-        \"\"\"Atestado enviado pelo colaborador (ou registrado pelo enfermeiro) e aprovado pela gerência.\"\"\"
+        \"\"\"Atestado enviado pelo colaborador (ou registrado pelo enfermeiro) e aprovado pela gerÃªncia.\"\"\"
         id = db.Column(db.Integer, primary_key=True)
         professional_id = db.Column(db.Integer, db.ForeignKey("professional.id"), nullable=False)
 
@@ -388,7 +388,7 @@ w("app/models.py", textwrap.dedent("""\
         message = db.Column(db.Text, nullable=False)
 
         sector_id = db.Column(db.Integer, db.ForeignKey("sector.id"), nullable=True)
-        created_by_name = db.Column(db.String(160), nullable=True)  # opcional (público)
+        created_by_name = db.Column(db.String(160), nullable=True)  # opcional (pÃºblico)
         created_by_email = db.Column(db.String(160), nullable=True)
 
         status = db.Column(db.String(20), nullable=False, default="OPEN")  # OPEN/CLOSED
@@ -429,7 +429,7 @@ w("app/auth.py", textwrap.dedent("""\
             senha = request.form.get("senha") or ""
             user = User.query.filter_by(email=email).first()
             if not user or not user.check_password(senha):
-                flash("Login inválido.", "danger")
+                flash("Login invÃ¡lido.", "danger")
                 return render_template("login.html")
             login_user(user)
             return redirect(url_for("main.home"))
@@ -480,7 +480,7 @@ w("app/manager.py", textwrap.dedent("""\
 
     def manager_required():
         if not current_user.is_manager():
-            flash("Acesso restrito à gerência.", "danger")
+            flash("Acesso restrito Ã  gerÃªncia.", "danger")
             return False
         return True
 
@@ -495,7 +495,7 @@ w("app/manager.py", textwrap.dedent("""\
         month_start = date(today.year, today.month, 1)
         next_month = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
 
-        # Extras/Folgas pendentes no mês
+        # Extras/Folgas pendentes no mÃªs
         extras = CoverageEvent.query.filter(
             CoverageEvent.coverage_type == CoverageType.EXTRA.value,
             CoverageEvent.created_at >= datetime(today.year, today.month, 1)
@@ -510,7 +510,7 @@ w("app/manager.py", textwrap.dedent("""\
         atestados_pendentes = CertificateRequest.query.filter_by(status=ApprovalStatus.PENDING.value).count()
         tickets_abertos = FeedbackTicket.query.filter_by(status="OPEN").count()
 
-        # Alerts 24h (simplificado: alertas ainda não enviados e scheduled_for <= agora)
+        # Alerts 24h (simplificado: alertas ainda Não enviados e scheduled_for <= agora)
         alerts_due = Alert.query.filter(Alert.sent_at == None, Alert.scheduled_for <= datetime.utcnow()).all()
 
         return render_template(
@@ -692,7 +692,7 @@ w("app/nurse.py", textwrap.dedent("""\
         turn = request.values.get("turn") or "D"
 
         if not sector_id:
-            flash("Cadastre um setor primeiro (seed já cria UTI 1/2/3).", "warning")
+            flash("Cadastre um setor primeiro (seed jÃ¡ cria UTI 1/2/3).", "warning")
             return render_template("nurse/daily.html", sectors=sectors, sector_id=0, shift_date=shift_date, turn=turn, rows=[])
 
         d = date.fromisoformat(shift_date)
@@ -754,7 +754,7 @@ w("app/nurse.py", textwrap.dedent("""\
     @nurse_bp.route("/coverage/add", methods=["POST"])
     @login_required
     def add_coverage():
-        \"\"\"Registrar remanejo/extra/folga quando o profissional não está escalado.\"\"\"
+        \"\"\"Registrar remanejo/extra/folga quando o profissional Não estÃ¡ escalado.\"\"\"
         pos_id = int(request.form.get("pos_id"))
         coverage_type = request.form.get("coverage_type")
         origin_sector_id = request.form.get("origin_sector_id")
@@ -773,7 +773,7 @@ w("app/nurse.py", textwrap.dedent("""\
         db.session.add(ev)
         db.session.commit()
 
-        flash("Cobertura registrada (pendente para gerência quando aplicável).", "success")
+        flash("Cobertura registrada (pendente para gerÃªncia quando aplicÃ¡vel).", "success")
         return redirect(url_for("nurse.daily", sector_id=pos.daily_shift.sector_id, shift_date=pos.daily_shift.shift_date.isoformat(), turn=pos.daily_shift.turn))
 
 
@@ -795,7 +795,7 @@ w("app/nurse.py", textwrap.dedent("""\
             )
             db.session.add(req)
             db.session.commit()
-            flash("Atestado enviado para aprovação.", "success")
+            flash("Atestado enviado para aprovaÃ§Ã£o.", "success")
             return redirect(url_for("nurse.dashboard"))
 
         return render_template("nurse/enviar_atestado.html", professionals=professionals)
@@ -821,7 +821,7 @@ w("app/feedback.py", textwrap.dedent("""\
             created_by_email = (request.form.get("email") or "").strip() or None
 
             if not subject or not message:
-                flash("Assunto e mensagem são obrigatórios.", "danger")
+                flash("Assunto e mensagem sÃ£o obrigatÃ³rios.", "danger")
                 return render_template("feedback/novo.html", sectors=sectors)
 
             t = FeedbackTicket(
@@ -835,7 +835,7 @@ w("app/feedback.py", textwrap.dedent("""\
             )
             db.session.add(t)
             db.session.commit()
-            flash("Enviado! Obrigado pelo contato. A gerência vai avaliar.", "success")
+            flash("Enviado! Obrigado pelo contato. A gerÃªncia vai avaliar.", "success")
             return redirect(url_for("feedback.novo"))
 
         return render_template("feedback/novo.html", sectors=sectors)
@@ -852,7 +852,7 @@ w("app/seed.py", textwrap.dedent("""\
 
     @click.command("seed")
     def seed_command():
-        \"\"\"Seed básico: admin, setores e alguns profissionais.\"\"\"
+        \"\"\"Seed bÃ¡sico: admin, setores e alguns profissionais.\"\"\"
         # Admin
         admin = User.query.filter_by(email="admin@portal.local").first()
         if not admin:
@@ -869,7 +869,7 @@ w("app/seed.py", textwrap.dedent("""\
 
         # Professionals (exemplo)
         sample = [
-            ("João Enfermeiro", "ENF"),
+            ("JoÃ£o Enfermeiro", "ENF"),
             ("Maria Enfermeira", "ENF"),
             ("Tec 1", "TEC"),
             ("Tec 2", "TEC"),
@@ -885,7 +885,7 @@ w("app/seed.py", textwrap.dedent("""\
 
         db.session.commit()
 
-        click.echo("Seed concluído: admin@portal.local / admin123, setores UTI 1/2/3 e profissionais exemplo.")
+        click.echo("Seed concluÃ­do: admin@portal.local / admin123, setores UTI 1/2/3 e profissionais exemplo.")
 """))
 
 # Templates (Bootstrap 5)
@@ -919,7 +919,7 @@ layout = """\
 <div class="app-shell d-flex">
   <aside class="sidebar p-3" style="width: 280px;">
     <div class="mb-3">
-      <div class="fw-bold text-white" style="font-size: 1.1rem;">Passagem de Plantão</div>
+      <div class="fw-bold text-white" style="font-size: 1.1rem;">Passagem de PlantÃ£o</div>
       <div class="muted" style="font-size: .9rem;">Nurse Manager Portal</div>
     </div>
     {% if current_user.is_authenticated %}
@@ -936,7 +936,7 @@ layout = """\
       {% endif %}
     </nav>
     <hr class="border-light opacity-10" />
-    <a class="nav-link" href="{{ url_for('feedback.novo') }}">📨 Enviar solicitação/elogio/reclamação</a>
+    <a class="nav-link" href="{{ url_for('feedback.novo') }}">ðŸ“¨ Enviar solicitaÃ§Ã£o/elogio/reclamaÃ§Ã£o</a>
   </aside>
 
   <main class="flex-fill p-4">
@@ -984,7 +984,7 @@ w("app/templates/login.html", textwrap.dedent("""\
 
       <hr class="border-light opacity-10 my-3" />
       <div class="muted" style="font-size: .9rem;">
-        Ou envie um contato para a gerência:
+        Ou envie um contato para a gerÃªncia:
         <a href="{{ url_for('feedback.novo') }}">abrir formulário</a>
       </div>
     </div>
@@ -997,11 +997,11 @@ w("app/templates/manager/dashboard.html", textwrap.dedent("""\
 {% extends "layout.html" %}
 {% set title = "Painel da Gerência" %}
 {% block sidebar %}
-  <a class="nav-link active" href="{{ url_for('manager.dashboard') }}">🏠 Painel</a>
-  <a class="nav-link" href="{{ url_for('manager.monthly_schedule') }}">🗓️ Escala mensal</a>
-  <a class="nav-link" href="{{ url_for('manager.folgas') }}">🟣 Folgas</a>
-  <a class="nav-link" href="{{ url_for('manager.atestados') }}">🧾 Atestados</a>
-  <a class="nav-link" href="{{ url_for('manager.tickets') }}">💬 Tickets (elogio/reclamação)</a>
+  <a class="nav-link active" href="{{ url_for('manager.dashboard') }}">ðŸ  Painel</a>
+  <a class="nav-link" href="{{ url_for('manager.monthly_schedule') }}">ðŸ—“ï¸ Escala mensal</a>
+  <a class="nav-link" href="{{ url_for('manager.folgas') }}">ðŸŸ£ Folgas</a>
+  <a class="nav-link" href="{{ url_for('manager.atestados') }}">ðŸ§¾ Atestados</a>
+  <a class="nav-link" href="{{ url_for('manager.tickets') }}">ðŸ’¬ Tickets (elogio/reclamações)</a>
 {% endblock %}
 
 {% block content %}
@@ -1021,7 +1021,7 @@ w("app/templates/manager/dashboard.html", textwrap.dedent("""\
   <div class="row g-3 mb-4">
     <div class="col-md-3">
       <div class="card p-3">
-        <div class="muted">Extras no mês</div>
+        <div class="muted">Extras no mÃªs</div>
         <div class="display-6">{{ extras }}</div>
       </div>
     </div>
@@ -1047,10 +1047,10 @@ w("app/templates/manager/dashboard.html", textwrap.dedent("""\
 
   <div class="card p-3">
     <div class="d-flex align-items-center justify-content-between">
-      <h5 class="mb-0">Alertas (Folga nas próximas 24h)</h5>
+      <h5 class="mb-0">Alertas (Folga nas prÃ³ximas 24h)</h5>
       <span class="badge badge-soft">{{ alerts_due|length }}</span>
     </div>
-    <div class="muted mb-2">Se tiver folga prevista, aparece aqui para não desfalcar o setor.</div>
+    <div class="muted mb-2">Se tiver folga prevista, aparece aqui para Não desfalcar o setor.</div>
 
     {% if alerts_due|length == 0 %}
       <div class="muted">Nenhum alerta no momento.</div>
@@ -1082,17 +1082,17 @@ w("app/templates/manager/monthly_create.html", textwrap.dedent("""\
 {% extends "layout.html" %}
 {% set title = "Escala mensal" %}
 {% block sidebar %}
-  <a class="nav-link" href="{{ url_for('manager.dashboard') }}">🏠 Painel</a>
-  <a class="nav-link active" href="{{ url_for('manager.monthly_schedule') }}">🗓️ Escala mensal</a>
-  <a class="nav-link" href="{{ url_for('manager.folgas') }}">🟣 Folgas</a>
-  <a class="nav-link" href="{{ url_for('manager.atestados') }}">🧾 Atestados</a>
-  <a class="nav-link" href="{{ url_for('manager.tickets') }}">💬 Tickets</a>
+  <a class="nav-link" href="{{ url_for('manager.dashboard') }}">ðŸ  Painel</a>
+  <a class="nav-link active" href="{{ url_for('manager.monthly_schedule') }}">ðŸ—“ï¸ Escala mensal</a>
+  <a class="nav-link" href="{{ url_for('manager.folgas') }}">ðŸŸ£ Folgas</a>
+  <a class="nav-link" href="{{ url_for('manager.atestados') }}">ðŸ§¾ Atestados</a>
+  <a class="nav-link" href="{{ url_for('manager.tickets') }}">ðŸ’¬ Tickets</a>
 {% endblock %}
 
 {% block content %}
   <div class="card p-4">
     <h4 class="mb-1">Criar escala mensal</h4>
-    <div class="muted mb-3">Selecione o setor e o mês. Depois você adiciona profissionais e turnos.</div>
+    <div class="muted mb-3">Selecione o setor e o mÃªs. Depois vocÃª adiciona profissionais e turnos.</div>
 
     <form method="post" class="row g-3">
       <div class="col-md-5">
@@ -1108,7 +1108,7 @@ w("app/templates/manager/monthly_create.html", textwrap.dedent("""\
         <input class="form-control" type="number" name="year" value="{{ (now() if false else '') }}" placeholder="2026" required />
       </div>
       <div class="col-md-2">
-        <label class="form-label">Mês</label>
+        <label class="form-label">MÃªs</label>
         <input class="form-control" type="number" min="1" max="12" name="month" placeholder="1" required />
       </div>
       <div class="col-12">
@@ -1123,18 +1123,18 @@ w("app/templates/manager/monthly_edit.html", textwrap.dedent("""\
 {% extends "layout.html" %}
 {% set title = "Editar escala mensal" %}
 {% block sidebar %}
-  <a class="nav-link" href="{{ url_for('manager.dashboard') }}">🏠 Painel</a>
-  <a class="nav-link active" href="{{ url_for('manager.monthly_schedule') }}">🗓️ Escala mensal</a>
-  <a class="nav-link" href="{{ url_for('manager.folgas') }}">🟣 Folgas</a>
-  <a class="nav-link" href="{{ url_for('manager.atestados') }}">🧾 Atestados</a>
-  <a class="nav-link" href="{{ url_for('manager.tickets') }}">💬 Tickets</a>
+  <a class="nav-link" href="{{ url_for('manager.dashboard') }}">ðŸ  Painel</a>
+  <a class="nav-link active" href="{{ url_for('manager.monthly_schedule') }}">ðŸ—“ï¸ Escala mensal</a>
+  <a class="nav-link" href="{{ url_for('manager.folgas') }}">ðŸŸ£ Folgas</a>
+  <a class="nav-link" href="{{ url_for('manager.atestados') }}">ðŸ§¾ Atestados</a>
+  <a class="nav-link" href="{{ url_for('manager.tickets') }}">ðŸ’¬ Tickets</a>
 {% endblock %}
 
 {% block content %}
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
     <div>
-      <h3 class="mb-0">Escala mensal — {{ sector.name }}</h3>
-      <div class="muted">{{ sched.month }}/{{ sched.year }} • ID {{ sched.id }}</div>
+      <h3 class="mb-0">Escala mensal â€” {{ sector.name }}</h3>
+      <div class="muted">{{ sched.month }}/{{ sched.year }} â€¢ ID {{ sched.id }}</div>
     </div>
     <a class="btn btn-soft" href="{{ url_for('manager.monthly_schedule') }}">+ Nova escala</a>
   </div>
@@ -1146,14 +1146,14 @@ w("app/templates/manager/monthly_edit.html", textwrap.dedent("""\
         <form method="post" class="d-flex gap-2">
           <select class="form-select" name="professional_id" required>
             {% for p in professionals %}
-              <option value="{{ p.id }}">{{ p.category }} — {{ p.name }}</option>
+              <option value="{{ p.id }}">{{ p.category }} â€” {{ p.name }}</option>
             {% endfor %}
           </select>
           <button class="btn btn-primary">Adicionar</button>
         </form>
         <div class="muted mt-2" style="font-size: .9rem;">
-          Após adicionar, edite o JSON de turnos por dia (ex: {"1":"D","2":"N","3":"F"}).
-          Na próxima etapa, a gente troca isso por uma grade estilo Excel.
+          ApÃ³s adicionar, edite o JSON de turnos por dia (ex: {"1":"D","2":"N","3":"F"}).
+          Na prÃ³xima etapa, a gente troca isso por uma grade estilo Excel.
         </div>
       </div>
     </div>
@@ -1164,7 +1164,7 @@ w("app/templates/manager/monthly_edit.html", textwrap.dedent("""\
           <h5 class="mb-0">Profissionais na escala</h5>
           <span class="badge badge-soft">{{ sched.assignments|length }}</span>
         </div>
-        <div class="muted mb-2">Por enquanto, salve os turnos via JSON (rápido). Depois a gente liga a tela estilo tabela.</div>
+        <div class="muted mb-2">Por enquanto, salve os turnos via JSON (rÃ¡pido). Depois a gente liga a tela estilo tabela.</div>
 
         <form method="post" action="{{ url_for('manager.monthly_save_days', schedule_id=sched.id) }}">
           <div class="table-responsive">
@@ -1178,7 +1178,7 @@ w("app/templates/manager/monthly_edit.html", textwrap.dedent("""\
               <tbody>
               {% for a in sched.assignments %}
                 <tr>
-                  <td>{{ a.professional.category }} — {{ a.professional.name }}</td>
+                  <td>{{ a.professional.category }} â€” {{ a.professional.name }}</td>
                   <td>
                     <textarea class="form-control" name="days_json_{{ a.id }}" rows="2">{{ a.days_json }}</textarea>
                   </td>
@@ -1199,16 +1199,16 @@ w("app/templates/manager/folgas.html", textwrap.dedent("""\
 {% extends "layout.html" %}
 {% set title = "Folgas" %}
 {% block sidebar %}
-  <a class="nav-link" href="{{ url_for('manager.dashboard') }}">🏠 Painel</a>
-  <a class="nav-link" href="{{ url_for('manager.monthly_schedule') }}">🗓️ Escala mensal</a>
-  <a class="nav-link active" href="{{ url_for('manager.folgas') }}">🟣 Folgas</a>
-  <a class="nav-link" href="{{ url_for('manager.atestados') }}">🧾 Atestados</a>
-  <a class="nav-link" href="{{ url_for('manager.tickets') }}">💬 Tickets</a>
+  <a class="nav-link" href="{{ url_for('manager.dashboard') }}">ðŸ  Painel</a>
+  <a class="nav-link" href="{{ url_for('manager.monthly_schedule') }}">ðŸ—“ï¸ Escala mensal</a>
+  <a class="nav-link active" href="{{ url_for('manager.folgas') }}">ðŸŸ£ Folgas</a>
+  <a class="nav-link" href="{{ url_for('manager.atestados') }}">ðŸ§¾ Atestados</a>
+  <a class="nav-link" href="{{ url_for('manager.tickets') }}">ðŸ’¬ Tickets</a>
 {% endblock %}
 
 {% block content %}
   <h3 class="mb-1">Folgas</h3>
-  <div class="muted mb-3">A gerência pode ajustar a data (por erro ou necessidade operacional).</div>
+  <div class="muted mb-3">A gerÃªncia pode ajustar a data (por erro ou necessidade operacional).</div>
 
   <div class="card p-3">
     <div class="table-responsive">
@@ -1216,7 +1216,7 @@ w("app/templates/manager/folgas.html", textwrap.dedent("""\
         <thead>
           <tr>
             <th>ID</th>
-            <th>Posição</th>
+            <th>PosiÃ§Ã£o</th>
             <th>Tipo</th>
             <th>Data folga</th>
             <th>Status</th>
@@ -1251,16 +1251,16 @@ w("app/templates/manager/atestados.html", textwrap.dedent("""\
 {% extends "layout.html" %}
 {% set title = "Atestados" %}
 {% block sidebar %}
-  <a class="nav-link" href="{{ url_for('manager.dashboard') }}">🏠 Painel</a>
-  <a class="nav-link" href="{{ url_for('manager.monthly_schedule') }}">🗓️ Escala mensal</a>
-  <a class="nav-link" href="{{ url_for('manager.folgas') }}">🟣 Folgas</a>
-  <a class="nav-link active" href="{{ url_for('manager.atestados') }}">🧾 Atestados</a>
-  <a class="nav-link" href="{{ url_for('manager.tickets') }}">💬 Tickets</a>
+  <a class="nav-link" href="{{ url_for('manager.dashboard') }}">ðŸ  Painel</a>
+  <a class="nav-link" href="{{ url_for('manager.monthly_schedule') }}">ðŸ—“ï¸ Escala mensal</a>
+  <a class="nav-link" href="{{ url_for('manager.folgas') }}">ðŸŸ£ Folgas</a>
+  <a class="nav-link active" href="{{ url_for('manager.atestados') }}">ðŸ§¾ Atestados</a>
+  <a class="nav-link" href="{{ url_for('manager.tickets') }}">ðŸ’¬ Tickets</a>
 {% endblock %}
 
 {% block content %}
   <h3 class="mb-1">Atestados</h3>
-  <div class="muted mb-3">Aprovação da gerência: ao aprovar, a ausência pode ser marcada como ATESTADO no dia.</div>
+  <div class="muted mb-3">AprovaÃ§Ã£o da gerÃªncia: ao aprovar, a ausÃªncia pode ser marcada como ATESTADO no dia.</div>
 
   <div class="card p-3">
     <div class="table-responsive">
@@ -1268,10 +1268,10 @@ w("app/templates/manager/atestados.html", textwrap.dedent("""\
         <thead>
           <tr>
             <th>Profissional</th>
-            <th>Início</th>
+            <th>InÃ­cio</th>
             <th>Fim</th>
             <th>Status</th>
-            <th>Ações</th>
+            <th>AÃ§Ãµes</th>
           </tr>
         </thead>
         <tbody>
@@ -1301,16 +1301,16 @@ w("app/templates/manager/tickets.html", textwrap.dedent("""\
 {% extends "layout.html" %}
 {% set title = "Tickets" %}
 {% block sidebar %}
-  <a class="nav-link" href="{{ url_for('manager.dashboard') }}">🏠 Painel</a>
-  <a class="nav-link" href="{{ url_for('manager.monthly_schedule') }}">🗓️ Escala mensal</a>
-  <a class="nav-link" href="{{ url_for('manager.folgas') }}">🟣 Folgas</a>
-  <a class="nav-link" href="{{ url_for('manager.atestados') }}">🧾 Atestados</a>
-  <a class="nav-link active" href="{{ url_for('manager.tickets') }}">💬 Tickets</a>
+  <a class="nav-link" href="{{ url_for('manager.dashboard') }}">ðŸ  Painel</a>
+  <a class="nav-link" href="{{ url_for('manager.monthly_schedule') }}">ðŸ—“ï¸ Escala mensal</a>
+  <a class="nav-link" href="{{ url_for('manager.folgas') }}">ðŸŸ£ Folgas</a>
+  <a class="nav-link" href="{{ url_for('manager.atestados') }}">ðŸ§¾ Atestados</a>
+  <a class="nav-link active" href="{{ url_for('manager.tickets') }}">ðŸ’¬ Tickets</a>
 {% endblock %}
 
 {% block content %}
-  <h3 class="mb-1">Solicitações / Elogios / Reclamações</h3>
-  <div class="muted mb-3">Triagem da gerência. Você pode encerrar tickets após tratativa.</div>
+  <h3 class="mb-1">SolicitaÃ§Ãµes / Elogios / ReclamaÃ§Ãµes</h3>
+  <div class="muted mb-3">Triagem da gerÃªncia. VocÃª pode encerrar tickets apÃ³s tratativa.</div>
 
   <div class="card p-3">
     <div class="table-responsive">
@@ -1322,7 +1322,7 @@ w("app/templates/manager/tickets.html", textwrap.dedent("""\
             <th>Setor</th>
             <th>Status</th>
             <th>Data</th>
-            <th>Ação</th>
+            <th>AÃ§Ã£o</th>
           </tr>
         </thead>
         <tbody>
@@ -1331,7 +1331,7 @@ w("app/templates/manager/tickets.html", textwrap.dedent("""\
             <td><span class="badge badge-soft">{{ t.ticket_type }}</span></td>
             <td>
               <div class="fw-semibold">{{ t.subject }}</div>
-              <div class="muted" style="font-size:.9rem;">{{ t.message[:140] }}{% if t.message|length > 140 %}…{% endif %}</div>
+              <div class="muted" style="font-size:.9rem;">{{ t.message[:140] }}{% if t.message|length > 140 %}â€¦{% endif %}</div>
             </td>
             <td>{{ t.sector.name if t.sector else "-" }}</td>
             <td>{{ t.status }}</td>
@@ -1343,7 +1343,7 @@ w("app/templates/manager/tickets.html", textwrap.dedent("""\
                 <button class="btn btn-sm btn-primary" name="action" value="close">Encerrar</button>
               </form>
               {% else %}
-                <span class="muted">—</span>
+                <span class="muted">â€”</span>
               {% endif %}
             </td>
           </tr>
@@ -1360,15 +1360,15 @@ w("app/templates/nurse/dashboard.html", textwrap.dedent("""\
 {% extends "layout.html" %}
 {% set title = "Painel do Enfermeiro" %}
 {% block sidebar %}
-  <a class="nav-link active" href="{{ url_for('nurse.dashboard') }}">🏠 Painel</a>
-  <a class="nav-link" href="{{ url_for('nurse.daily') }}">📋 Escala do dia</a>
-  <a class="nav-link" href="{{ url_for('nurse.enviar_atestado') }}">🧾 Enviar atestado</a>
+  <a class="nav-link active" href="{{ url_for('nurse.dashboard') }}">ðŸ  Painel</a>
+  <a class="nav-link" href="{{ url_for('nurse.daily') }}">ðŸ“‹ Escala do dia</a>
+  <a class="nav-link" href="{{ url_for('nurse.enviar_atestado') }}">ðŸ§¾ Enviar atestado</a>
 {% endblock %}
 
 {% block content %}
   <div class="hero rounded-4 p-4 mb-4">
-    <h2 class="mb-1">Escala do dia (rápida)</h2>
-    <div class="muted">Selecione setor, data e turno. O sistema sugere quem está escalado no mês, e você ajusta trocas/remanejos.</div>
+    <h2 class="mb-1">Escala do dia (rÃ¡pida)</h2>
+    <div class="muted">Selecione setor, data e turno. O sistema sugere quem estÃ¡ escalado no mÃªs, e vocÃª ajusta trocas/remanejos.</div>
     <div class="mt-3">
       <a class="btn btn-primary" href="{{ url_for('nurse.daily') }}">Abrir escala do dia</a>
     </div>
@@ -1389,14 +1389,14 @@ w("app/templates/nurse/daily.html", textwrap.dedent("""\
 {% extends "layout.html" %}
 {% set title = "Escala do dia" %}
 {% block sidebar %}
-  <a class="nav-link" href="{{ url_for('nurse.dashboard') }}">🏠 Painel</a>
-  <a class="nav-link active" href="{{ url_for('nurse.daily') }}">📋 Escala do dia</a>
-  <a class="nav-link" href="{{ url_for('nurse.enviar_atestado') }}">🧾 Enviar atestado</a>
+  <a class="nav-link" href="{{ url_for('nurse.dashboard') }}">ðŸ  Painel</a>
+  <a class="nav-link active" href="{{ url_for('nurse.daily') }}">ðŸ“‹ Escala do dia</a>
+  <a class="nav-link" href="{{ url_for('nurse.enviar_atestado') }}">ðŸ§¾ Enviar atestado</a>
 {% endblock %}
 
 {% block content %}
   <h3 class="mb-1">Escala do dia</h3>
-  <div class="muted mb-3">Ajuste trocas, faltas, remanejamentos e extras. Tudo fica registrado para a gerência.</div>
+  <div class="muted mb-3">Ajuste trocas, faltas, remanejamentos e extras. Tudo fica registrado para a gerÃªncia.</div>
 
   <div class="card p-3 mb-3">
     <form method="get" class="row g-2 align-items-end">
@@ -1431,10 +1431,10 @@ w("app/templates/nurse/daily.html", textwrap.dedent("""\
         <table class="table table-sm align-middle">
           <thead>
             <tr>
-              <th>Posição</th>
+              <th>PosiÃ§Ã£o</th>
               <th>Escalado (mensal)</th>
               <th>Presente (real)</th>
-              <th>Ausência</th>
+              <th>AusÃªncia</th>
               <th>Obs</th>
               <th>Cobertura</th>
             </tr>
@@ -1446,26 +1446,26 @@ w("app/templates/nurse/daily.html", textwrap.dedent("""\
 
                 <td>
                   <select class="form-select form-select-sm" name="scheduled_{{ pos.id }}">
-                    <option value="">—</option>
+                    <option value="">â€”</option>
                     {% for p in professionals %}
-                      <option value="{{ p.id }}" {% if pos.scheduled_professional_id==p.id %}selected{% endif %}>{{ p.category }} — {{ p.name }}</option>
+                      <option value="{{ p.id }}" {% if pos.scheduled_professional_id==p.id %}selected{% endif %}>{{ p.category }} â€” {{ p.name }}</option>
                     {% endfor %}
                   </select>
                 </td>
 
                 <td>
                   <select class="form-select form-select-sm" name="actual_{{ pos.id }}">
-                    <option value="">—</option>
+                    <option value="">â€”</option>
                     {% for p in professionals %}
-                      <option value="{{ p.id }}" {% if pos.actual_professional_id==p.id %}selected{% endif %}>{{ p.category }} — {{ p.name }}</option>
+                      <option value="{{ p.id }}" {% if pos.actual_professional_id==p.id %}selected{% endif %}>{{ p.category }} â€” {{ p.name }}</option>
                     {% endfor %}
                   </select>
                 </td>
 
                 <td style="min-width: 160px;">
                   <select class="form-select form-select-sm" name="absence_{{ pos.id }}">
-                    <option value="">—</option>
-                    <option value="FALTA_NJ" {% if pos.absence_type=="FALTA_NJ" %}selected{% endif %}>Falta (não just.)</option>
+                    <option value="">â€”</option>
+                    <option value="FALTA_NJ" {% if pos.absence_type=="FALTA_NJ" %}selected{% endif %}>Falta (Não just.)</option>
                     <option value="FALTA_J" {% if pos.absence_type=="FALTA_J" %}selected{% endif %}>Falta (just.)</option>
                     <option value="ATESTADO" {% if pos.absence_type=="ATESTADO" %}selected{% endif %}>Atestado</option>
                   </select>
@@ -1483,9 +1483,9 @@ w("app/templates/nurse/daily.html", textwrap.dedent("""\
                   </button>
                   <div class="muted" style="font-size:.85rem;">
                     {% if pos.coverage_events|length > 0 %}
-                      {{ pos.coverage_events[-1].coverage_type }} • {{ pos.coverage_events[-1].status }}
+                      {{ pos.coverage_events[-1].coverage_type }} â€¢ {{ pos.coverage_events[-1].status }}
                     {% else %}
-                      —
+                      â€”
                     {% endif %}
                   </div>
                 </td>
@@ -1514,13 +1514,13 @@ w("app/templates/nurse/daily.html", textwrap.dedent("""\
             <select class="form-select" name="coverage_type" id="cov_type">
               <option value="REMANEJO">Remanejo</option>
               <option value="EXTRA">Extra</option>
-              <option value="FOLGA">Folga (compensação)</option>
+              <option value="FOLGA">Folga (compensaÃ§Ã£o)</option>
             </select>
 
             <div class="mt-3" id="cov_origin_wrap">
               <label class="form-label">Origem (setor)</label>
               <select class="form-select" name="origin_sector_id">
-                <option value="">—</option>
+                <option value="">â€”</option>
                 {% for s in sectors %}
                   <option value="{{ s.id }}">{{ s.name }}</option>
                 {% endfor %}
@@ -1529,13 +1529,13 @@ w("app/templates/nurse/daily.html", textwrap.dedent("""\
             </div>
 
             <div class="mt-3 d-none" id="cov_offdate_wrap">
-              <label class="form-label">Data prevista da folga (obrigatória)</label>
+              <label class="form-label">Data prevista da folga (obrigatÃ³ria)</label>
               <input class="form-control" type="date" name="off_date" />
-              <div class="form-text">A gerência pode ajustar depois. Sistema avisa 24h antes.</div>
+              <div class="form-text">A gerÃªncia pode ajustar depois. Sistema avisa 24h antes.</div>
             </div>
 
             <div class="mt-3 muted" style="font-size:.9rem;">
-              Regra: se o profissional não estava escalado, registre como EXTRA ou FOLGA para governança.
+              Regra: se o profissional Não estava escalado, registre como EXTRA ou FOLGA para governanÃ§a.
             </div>
           </div>
           <div class="modal-footer">
@@ -1575,27 +1575,27 @@ w("app/templates/nurse/enviar_atestado.html", textwrap.dedent("""\
 {% extends "layout.html" %}
 {% set title = "Enviar atestado" %}
 {% block sidebar %}
-  <a class="nav-link" href="{{ url_for('nurse.dashboard') }}">🏠 Painel</a>
-  <a class="nav-link" href="{{ url_for('nurse.daily') }}">📋 Escala do dia</a>
-  <a class="nav-link active" href="{{ url_for('nurse.enviar_atestado') }}">🧾 Enviar atestado</a>
+  <a class="nav-link" href="{{ url_for('nurse.dashboard') }}">ðŸ  Painel</a>
+  <a class="nav-link" href="{{ url_for('nurse.daily') }}">ðŸ“‹ Escala do dia</a>
+  <a class="nav-link active" href="{{ url_for('nurse.enviar_atestado') }}">ðŸ§¾ Enviar atestado</a>
 {% endblock %}
 
 {% block content %}
   <div class="card p-4" style="max-width: 720px;">
     <h4 class="mb-1">Enviar atestado</h4>
-    <div class="muted mb-3">Vai para aprovação da gerência. Depois você marca o dia como ATESTADO na escala diária.</div>
+    <div class="muted mb-3">Vai para aprovaÃ§Ã£o da gerÃªncia. Depois vocÃª marca o dia como ATESTADO na escala diÃ¡ria.</div>
 
     <form method="post" class="row g-3">
       <div class="col-md-12">
         <label class="form-label">Profissional</label>
         <select class="form-select" name="professional_id" required>
           {% for p in professionals %}
-            <option value="{{ p.id }}">{{ p.category }} — {{ p.name }}</option>
+            <option value="{{ p.id }}">{{ p.category }} â€” {{ p.name }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="col-md-6">
-        <label class="form-label">Início</label>
+        <label class="form-label">InÃ­cio</label>
         <input class="form-control" type="date" name="start_date" required />
       </div>
       <div class="col-md-6">
@@ -1613,30 +1613,30 @@ w("app/templates/nurse/enviar_atestado.html", textwrap.dedent("""\
 # Feedback template
 w("app/templates/feedback/novo.html", textwrap.dedent("""\
 {% extends "layout.html" %}
-{% set title = "Contato com a Gerência" %}
+{% set title = "Contato com a GerÃªncia" %}
 {% block sidebar %}
-  <a class="nav-link active" href="{{ url_for('feedback.novo') }}">📨 Enviar contato</a>
-  <a class="nav-link" href="{{ url_for('auth.login') }}">🔐 Login</a>
+  <a class="nav-link active" href="{{ url_for('feedback.novo') }}">ðŸ“¨ Enviar contato</a>
+  <a class="nav-link" href="{{ url_for('auth.login') }}">ðŸ” Login</a>
 {% endblock %}
 
 {% block content %}
   <div class="card p-4" style="max-width: 780px;">
-    <h3 class="mb-1">Fale com a Gerência</h3>
-    <div class="muted mb-3">Envie solicitação, elogio ou reclamação. Você pode se identificar ou enviar anônimo.</div>
+    <h3 class="mb-1">Fale com a GerÃªncia</h3>
+    <div class="muted mb-3">Envie solicitaÃ§Ã£o, elogio ou reclamaÃ§Ã£o. VocÃª pode se identificar ou enviar anÃ´nimo.</div>
 
     <form method="post" class="row g-3">
       <div class="col-md-4">
         <label class="form-label">Tipo</label>
         <select class="form-select" name="ticket_type">
-          <option value="SOLICITACAO">Solicitação</option>
+          <option value="SOLICITACAO">SolicitaÃ§Ã£o</option>
           <option value="ELOGIO">Elogio</option>
-          <option value="RECLAMACAO">Reclamação</option>
+          <option value="RECLAMACAO">ReclamaÃ§Ã£o</option>
         </select>
       </div>
       <div class="col-md-4">
         <label class="form-label">Setor (opcional)</label>
         <select class="form-select" name="sector_id">
-          <option value="">—</option>
+          <option value="">â€”</option>
           {% for s in sectors %}
             <option value="{{ s.id }}">{{ s.name }}</option>
           {% endfor %}
@@ -1671,12 +1671,12 @@ w("app/templates/feedback/novo.html", textwrap.dedent("""\
 """))
 
 # Optional React component (placeholders)
-w("frontend/src/pages/Scales.tsx", open("/mnt/data/Scales.tsx","r",encoding="utf-8").read() if os.path.exists("/mnt/data/Scales.tsx") else "// (arquivo não fornecido)\n")
+w("frontend/src/pages/Scales.tsx", open("/mnt/data/Scales.tsx","r",encoding="utf-8").read() if os.path.exists("/mnt/data/Scales.tsx") else "// (arquivo Não fornecido)\n")
 
 w("frontend/README_frontend.md", textwrap.dedent("""\
     # Frontend (opcional)
-    Este patch inclui um exemplo de página React: `frontend/src/pages/Scales.tsx`.
-    Se seu projeto ainda não tem frontend React, ignore esta pasta por enquanto.
+    Este patch inclui um exemplo de pÃ¡gina React: `frontend/src/pages/Scales.tsx`.
+    Se seu projeto ainda Não tem frontend React, ignore esta pasta por enquanto.
 """))
 
 # Create zip
@@ -1692,4 +1692,7 @@ with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as z:
             z.write(full, rel)
 
 zip_path
+
+
+
 

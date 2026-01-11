@@ -1,20 +1,20 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from datetime import datetime, date
 from ..extensions import db
 
 # Turnos aceitos
 SHIFT_CHOICES = ("D", "N", "M", "T", "MT")
 
-# Status do dia (escala diária)
+# Status do dia (escala diÃ¡ria)
 DAY_STATUS = (
     "OK",                 # veio conforme escala
-    "FALTA_NJ",           # falta não justificada
-    "FALTA_J",            # falta justificada (se você quiser usar)
+    "FALTA_NJ",           # falta Não justificada
+    "FALTA_J",            # falta justificada (se vocÃª quiser usar)
     "ATESTADO_PEND",      # colaborador enviou, aguardando gestor
     "ATESTADO_OK",        # gestor aprovou
     "REMANEJADO",         # veio de outro setor
     "EXTRA",              # cobertura extra
-    "FOLGA_COMP",         # cobertura por folga compensatória
+    "FOLGA_COMP",         # cobertura por folga compensatÃ³ria
 )
 
 class NursingMonthlySchedule(db.Model):
@@ -30,7 +30,7 @@ class NursingMonthlySchedule(db.Model):
     year = db.Column(db.Integer, nullable=False, index=True)
     month = db.Column(db.Integer, nullable=False, index=True)  # 1-12
 
-    # draft -> editável; published -> equipe visualiza; archived -> histórico
+    # draft -> editÃ¡vel; published -> equipe visualiza; archived -> histÃ³rico
     status = db.Column(db.String(20), default="draft", nullable=False, index=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -41,7 +41,7 @@ class NursingMonthlySchedule(db.Model):
 
 class NursingMonthlyMember(db.Model):
     """
-    Quem está na escala mensal e em qual 'posição' (para preencher grade).
+    Quem estÃ¡ na escala mensal e em qual 'posiÃ§Ã£o' (para preencher grade).
     Ex.: ENF 1, TEC 1..6.
     """
     __tablename__ = "nursing_monthly_members"
@@ -54,7 +54,7 @@ class NursingMonthlyMember(db.Model):
     # enfermeiro / tecnico / fisioterapeuta (se quiser expandir depois)
     role = db.Column(db.String(20), nullable=False, index=True)
 
-    # posição visual na grade (ex: TEC 1..6; ENF 1..2)
+    # posiÃ§Ã£o visual na grade (ex: TEC 1..6; ENF 1..2)
     position = db.Column(db.Integer, nullable=False, index=True)
 
     active = db.Column(db.Boolean, default=True, nullable=False)
@@ -68,7 +68,7 @@ class NursingMonthlyMember(db.Model):
 
 class NursingMonthlyCell(db.Model):
     """
-    Célula da grade mensal: qual membro está escalado em um dia específico e turno.
+    CÃ©lula da grade mensal: qual membro estÃ¡ escalado em um dia especÃ­fico e turno.
     Ex.: dia 10, turno D, TEC 3 = user X.
     """
     __tablename__ = "nursing_monthly_cells"
@@ -93,7 +93,7 @@ class NursingMonthlyCell(db.Model):
 class NursingDailyOverride(db.Model):
     """
     O que aconteceu de verdade no dia (override da escala mensal).
-    Se existir registro aqui, ele manda na escala diária.
+    Se existir registro aqui, ele manda na escala diÃ¡ria.
     """
     __tablename__ = "nursing_daily_overrides"
 
@@ -118,7 +118,7 @@ class NursingDailyOverride(db.Model):
 
     # extra/folga
     extra_type = db.Column(db.String(10), nullable=True)   # "EXTRA" | "FOLGA"
-    comp_day = db.Column(db.Date, nullable=True)           # se folga, dia da folga compensatória
+    comp_day = db.Column(db.Date, nullable=True)           # se folga, dia da folga compensatÃ³ria
 
     notes = db.Column(db.String(255), nullable=True)
 
@@ -128,3 +128,6 @@ class NursingDailyOverride(db.Model):
     __table_args__ = (
         db.UniqueConstraint("sector_id", "date", "shift", "role", "position", name="uq_daily_override"),
     )
+
+
+

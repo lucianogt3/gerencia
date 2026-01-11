@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, send_from_directory, current_app
+﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, send_from_directory, current_app
 from flask_login import login_required, current_user
 from ...utils.security import require_active, require_roles
 from ...utils.uploads import save_upload
@@ -68,3 +68,6 @@ def view(scale_id: int):
 def file(filename: str):
     folder = os.path.join(current_app.config["UPLOAD_FOLDER"], "scales")
     return send_from_directory(folder, filename, as_attachment=False)
+
+
+

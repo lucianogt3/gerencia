@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from datetime import datetime
 from ...extensions import db
 from ...models.document import DocumentRead
@@ -13,3 +13,6 @@ def register_open(document_id: int, user_id: int) -> None:
         rec.last_opened_at = now
         rec.open_count = (rec.open_count or 0) + 1
     db.session.commit()
+
+
+

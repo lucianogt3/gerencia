@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from datetime import datetime
 from ..extensions import db
 
@@ -13,3 +13,6 @@ class Sector(db.Model):
 
     def __repr__(self) -> str:
         return f"<Sector {self.name}>"
+
+
+

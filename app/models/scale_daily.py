@@ -1,4 +1,4 @@
-from datetime import date, datetime
+﻿from datetime import date, datetime
 from ..extensions import db
 
 class ScaleDaily(db.Model):
@@ -29,3 +29,6 @@ class ScaleDaily(db.Model):
     observacao = db.Column(db.String(255), nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+

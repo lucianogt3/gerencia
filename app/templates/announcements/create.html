@@ -1,0 +1,60 @@
+{% extends "layouts/base.html" %}
+
+{% block content %}
+<div class="dash">
+  <div class="page-head">
+    <div class="page-head-left">
+      <h1>📣 Novo Comunicado</h1>
+      <div class="muted">Crie um novo comunicado para a equipe</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      
+      <div class="form-group" style="margin-bottom: 20px;">
+        <label>Título *</label>
+        <input class="input" type="text" name="title" required 
+               placeholder="Ex: Novas normas de biossegurança">
+      </div>
+      
+      <div class="form-group" style="margin-bottom: 20px;">
+        <label>Tipo</label>
+        <select class="input" name="tipo">
+          <option value="geral">Geral</option>
+          <option value="urgente">Urgente</option>
+          <option value="informativo">Informativo</option>
+        </select>
+      </div>
+      
+      <div class="form-group" style="margin-bottom: 20px;">
+        <label>Setor (opcional)</label>
+        <select class="input" name="setor">
+          <option value="">Todos os setores</option>
+          {% for s in sectors %}
+          <option value="{{ s.name }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      
+      <div class="form-group" style="margin-bottom: 20px;">
+        <label>Conteúdo *</label>
+        <textarea class="input" name="content" rows="10" required 
+                  placeholder="Digite o conteúdo do comunicado..."></textarea>
+      </div>
+      
+      <div style="display: flex; gap: 12px; margin-top: 30px;">
+        <button class="btn" type="submit">
+          💾 Publicar Comunicado
+        </button>
+        
+        <a class="btn secondary" href="{{ url_for('docs.index') }}">
+          ↩️ Cancelar
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+

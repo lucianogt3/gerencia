@@ -1,38 +1,77 @@
-{% extends "layouts/base.html" %}
+﻿{% extends "layouts/base.html" %}
+
 {% block content %}
-  <h1>Solicitar acesso</h1>
-  <form method="post">
-    {{ form.csrf_token }}
-    <div class="grid">
-      <div>
-        <label>Matrícula/ID</label>
-        {{ form.matricula(class_="input") }}
-      </div>
-      <div>
-        <label>Nome</label>
-        {{ form.nome(class_="input") }}
-      </div>
-      <div>
-        <label>E-mail (opcional)</label>
-        {{ form.email(class_="input") }}
-      </div>
-      <div>
-        <label>Setor (opcional)</label>
-        {{ form.setor(class_="input") }}
-      </div>
-      <div>
-        <label>Turno (opcional)</label>
-        {{ form.turno(class_="input") }}
-      </div>
-      <div>
-        <label>Nascimento (opcional)</label>
-        {{ form.nascimento(class_="input") }}
-      </div>
+  <div class="row">
+    <h1>Solicitar acesso</h1>
+    <p class="muted">Seja bem vindo ao Painel.</p>
+  </div>
+
+  <form method="post" class="card" style="max-width: 720px;">
+    {{ form.hidden_tag() }}
+
+    <div class="grid" style="display:grid; gap:12px; grid-template-columns: 1fr 1fr;">
+
       <div style="grid-column: 1 / -1;">
-        <label>Senha</label>
-        {{ form.password(class_="input") }}
+        <label for="nome">Nome completo</label>
+        {{ form.nome(id="nome", class_="input", placeholder="Seu nome completo") }}
+        {% for e in form.nome.errors %}
+          <div class="muted" style="color:#b00;">{{ e }}</div>
+        {% endfor %}
       </div>
+
+      <div style="grid-column: 1 / -1;">
+        <label for="email">E-mail (opcional)</label>
+        {{ form.email(id="email", class_="input", placeholder="seuemail@exemplo.com") }}
+        {% for e in form.email.errors %}
+          <div class="muted" style="color:#b00;">{{ e }}</div>
+        {% endfor %}
+      </div>
+
+      <div>
+        <label for="setor">Setor (opcional)</label>
+        {{ form.setor(id="setor", class_="input") }}
+        {% for e in form.setor.errors %}
+          <div class="muted" style="color:#b00;">{{ e }}</div>
+        {% endfor %}
+      </div>
+
+      <div>
+        <label for="turno">Turno (opcional)</label>
+        {{ form.turno(id="turno", class_="input") }}
+        {% for e in form.turno.errors %}
+          <div class="muted" style="color:#b00;">{{ e }}</div>
+        {% endfor %}
+      </div>
+
+      <div style="grid-column: 1 / -1;">
+        <label for="role">Cargo <span class="muted">(obrigatório)</span></label>
+        {{ form.role(id="role", class_="input") }}
+        {% for e in form.role.errors %}
+          <div class="muted" style="color:#b00;">{{ e }}</div>
+        {% endfor %}
+      </div>
+
+      <div>
+        <label for="nascimento">Nascimento <span class="muted">(obrigatório)</span></label>
+        {{ form.nascimento(id="nascimento", class_="input", type="date") }}
+        {% for e in form.nascimento.errors %}
+          <div class="muted" style="color:#b00;">{{ e }}</div>
+        {% endfor %}
+      </div>
+
+      <div>
+        <label for="password">Senha</label>
+        {{ form.password(id="password", class_="input", placeholder="Crie uma senha") }}
+        {% for e in form.password.errors %}
+          <div class="muted" style="color:#b00;">{{ e }}</div>
+        {% endfor %}
+      </div>
+
     </div>
-    <button class="btn" type="submit">{{ form.submit.label.text }}</button>
+
+    <div style="margin-top:14px; display:flex; gap:10px; align-items:center;">
+      <button class="btn" type="submit">Solicitar acesso</button>
+      <a class="btn btn-outline" href="{{ url_for('auth.login') }}">Voltar</a>
+    </div>
   </form>
 {% endblock %}

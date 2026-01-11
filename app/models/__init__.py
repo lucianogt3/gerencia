@@ -1,4 +1,4 @@
-from .user import User
+﻿from .user import User
 from .document import Document, DocumentVersion, DocumentRead
 from .scale import Scale
 
@@ -15,7 +15,7 @@ from .nursing_schedule import (
 )
 
 __all__ = [
-    # Auth / Usuários / Config
+    # Auth / UsuÃ¡rios / Config
     "User",
     "Sector",
 
@@ -43,4 +43,7 @@ __all__ = [
     # Comunicados
     "Announcement",
 ]
+
+
+
 

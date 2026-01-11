@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from datetime import datetime, date
 from ..extensions import db
 
@@ -19,3 +19,6 @@ class SickNote(db.Model):
 
     status = db.Column(db.String(20), default="pending", nullable=False, index=True)  # pending/validated/rejected
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+

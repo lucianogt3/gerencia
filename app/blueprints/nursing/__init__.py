@@ -1,11 +1,12 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import calendar
 from datetime import datetime, date
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
+from .routes import bp  # noqa: F401
 
-# ATENÇÃO: aqui são 3 pontos (...) porque estamos em app/blueprints/nursing/
+# ATENÃ‡ÃƒO: aqui sÃ£o 3 pontos (...) porque estamos em app/blueprints/nursing/
 from ...extensions import db
 from ...models import (
     Sector, User,
@@ -14,7 +15,7 @@ from ...models import (
 
 bp = Blueprint("nursing_api", __name__, url_prefix="/api/nursing")
 
-# Status válidos para o override diário
+# Status vÃ¡lidos para o override diÃ¡rio
 DAY_STATUS = {
     "OK",
     "FALTA",
@@ -42,16 +43,16 @@ def list_sectors():
 @login_required
 def create_sector():
     if not _require_manager():
-        return jsonify({"error": "Sem permissão"}), 403
+        return jsonify({"error": "Sem permissÃ£o"}), 403
 
     data = request.get_json(force=True) or {}
     name = (data.get("name") or "").strip()
     if not name:
-        return jsonify({"error": "Nome do setor é obrigatório"}), 400
+        return jsonify({"error": "Nome do setor Ã© obrigatÃ³rio"}), 400
 
     exists = Sector.query.filter_by(name=name).first()
     if exists:
-        return jsonify({"error": "Setor já existe"}), 409
+        return jsonify({"error": "Setor jÃ¡ existe"}), 409
 
     s = Sector(name=name, active=True)
     db.session.add(s)
@@ -63,10 +64,10 @@ def create_sector():
 @login_required
 def create_or_get_monthly():
     """
-    Gerência cria (ou busca) escala mensal por setor/ano/mês.
+    GerÃªncia cria (ou busca) escala mensal por setor/ano/mÃªs.
     """
     if not _require_manager():
-        return jsonify({"error": "Sem permissão"}), 403
+        return jsonify({"error": "Sem permissÃ£o"}), 403
 
     data = request.get_json(force=True) or {}
     sector_id = int(data.get("sector_id") or 0)
@@ -74,7 +75,7 @@ def create_or_get_monthly():
     month = int(data.get("month") or 0)
 
     if not sector_id or not year or month < 1 or month > 12:
-        return jsonify({"error": "sector_id/ano/mês inválidos"}), 400
+        return jsonify({"error": "sector_id/ano/mÃªs invÃ¡lidos"}), 400
 
     sched = NursingMonthlySchedule.query.filter_by(
         sector_id=sector_id, year=year, month=month
@@ -103,16 +104,16 @@ def create_or_get_monthly():
 def get_monthly(schedule_id: int):
     """
     Retorna estrutura para montar a grade:
-    - dias do mês
+    - dias do mÃªs
     - membros (linhas)
-    - células planejadas
+    - cÃ©lulas planejadas
     """
     sched = NursingMonthlySchedule.query.get_or_404(schedule_id)
     sector = Sector.query.get(sched.sector_id)
 
-    # se não for gerente/admin, só deixa ver se publicado
+    # se Não for gerente/admin, sÃ³ deixa ver se publicado
     if getattr(current_user, "role", "") not in ("manager", "admin") and sched.status != "published":
-        return jsonify({"error": "Escala não publicada"}), 403
+        return jsonify({"error": "Escala Não publicada"}), 403
 
     days_in_month = calendar.monthrange(sched.year, sched.month)[1]
     members = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, active=True).all()
@@ -152,14 +153,14 @@ def get_monthly(schedule_id: int):
 @login_required
 def upsert_member(schedule_id: int):
     """
-    Gerência: adiciona colaborador como linha da grade (role + position).
+    GerÃªncia: adiciona colaborador como linha da grade (role + position).
     """
     if not _require_manager():
-        return jsonify({"error": "Sem permissão"}), 403
+        return jsonify({"error": "Sem permissÃ£o"}), 403
 
     sched = NursingMonthlySchedule.query.get_or_404(schedule_id)
     if sched.status != "draft":
-        return jsonify({"error": "Escala não está em rascunho"}), 400
+        return jsonify({"error": "Escala Não estÃ¡ em rascunho"}), 400
 
     data = request.get_json(force=True) or {}
     user_id = int(data.get("user_id") or 0)
@@ -167,11 +168,11 @@ def upsert_member(schedule_id: int):
     position = int(data.get("position") or 0)
 
     if not user_id or role not in ("tecnico", "enfermeiro") or position <= 0:
-        return jsonify({"error": "Dados inválidos"}), 400
+        return jsonify({"error": "Dados invÃ¡lidos"}), 400
 
     u = User.query.get(user_id)
     if not u:
-        return jsonify({"error": "Usuário não encontrado"}), 404
+        return jsonify({"error": "UsuÃ¡rio Não encontrado"}), 404
 
     m = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, user_id=user_id).first()
     if not m:
@@ -196,14 +197,14 @@ def upsert_member(schedule_id: int):
 @login_required
 def set_monthly_cell(schedule_id: int):
     """
-    Gerência: define célula planejada (dia + turno + role + position -> planned_user_id).
+    GerÃªncia: define cÃ©lula planejada (dia + turno + role + position -> planned_user_id).
     """
     if not _require_manager():
-        return jsonify({"error": "Sem permissão"}), 403
+        return jsonify({"error": "Sem permissÃ£o"}), 403
 
     sched = NursingMonthlySchedule.query.get_or_404(schedule_id)
     if sched.status != "draft":
-        return jsonify({"error": "Escala não está em rascunho"}), 400
+        return jsonify({"error": "Escala Não estÃ¡ em rascunho"}), 400
 
     data = request.get_json(force=True) or {}
     day = int(data.get("day") or 0)
@@ -215,13 +216,13 @@ def set_monthly_cell(schedule_id: int):
 
     days_in_month = calendar.monthrange(sched.year, sched.month)[1]
     if day < 1 or day > days_in_month:
-        return jsonify({"error": "Dia inválido"}), 400
+        return jsonify({"error": "Dia invÃ¡lido"}), 400
     if shift not in ("D", "N", "M", "T", "MT"):
-        return jsonify({"error": "Turno inválido"}), 400
+        return jsonify({"error": "Turno invÃ¡lido"}), 400
     if role not in ("tecnico", "enfermeiro"):
-        return jsonify({"error": "Role inválida"}), 400
+        return jsonify({"error": "Role invÃ¡lida"}), 400
     if position <= 0:
-        return jsonify({"error": "Posição inválida"}), 400
+        return jsonify({"error": "PosiÃ§Ã£o invÃ¡lida"}), 400
 
     cell = NursingMonthlyCell.query.filter_by(
         schedule_id=sched.id, day=day, shift=shift, role=role, position=position
@@ -248,7 +249,7 @@ def set_monthly_cell(schedule_id: int):
 @login_required
 def publish_monthly(schedule_id: int):
     if not _require_manager():
-        return jsonify({"error": "Sem permissão"}), 403
+        return jsonify({"error": "Sem permissÃ£o"}), 403
 
     sched = NursingMonthlySchedule.query.get_or_404(schedule_id)
     sched.status = "published"
@@ -259,14 +260,14 @@ def publish_monthly(schedule_id: int):
 
 
 # --------------------------
-# Escala diária (enfermeiro)
+# Escala Diária(enfermeiro)
 # --------------------------
 
 @bp.get("/daily")
 @login_required
 def get_daily_view():
     """
-    Retorna escala diária consolidada:
+    Retorna Escala Diáriaconsolidada:
     - pega plano mensal (cells do dia/turno)
     - aplica override (daily_overrides) se houver
     """
@@ -275,18 +276,18 @@ def get_daily_view():
     shift = (request.args.get("shift") or "").strip().upper()
 
     if not sector_id or not dt_str or shift not in ("D", "N", "M", "T", "MT"):
-        return jsonify({"error": "Parâmetros inválidos"}), 400
+        return jsonify({"error": "ParÃ¢metros invÃ¡lidos"}), 400
 
     try:
         dt = date.fromisoformat(dt_str)
     except ValueError:
-        return jsonify({"error": "Data inválida (use YYYY-MM-DD)"}), 400
+        return jsonify({"error": "Data invÃ¡lida (use YYYY-MM-DD)"}), 400
 
     sched = NursingMonthlySchedule.query.filter_by(
         sector_id=sector_id, year=dt.year, month=dt.month, status="published"
     ).first()
     if not sched:
-        return jsonify({"error": "Escala mensal não publicada para este setor/mês"}), 404
+        return jsonify({"error": "Escala mensal Não publicada para este setor/mÃªs"}), 404
 
     day = dt.day
 
@@ -343,7 +344,7 @@ def get_daily_view():
 @login_required
 def set_daily_override():
     """
-    Enfermeiro registra mudanças:
+    Enfermeiro registra mudanÃ§as:
     - falta
     - atestado pendente
     - remanejamento
@@ -376,23 +377,23 @@ def set_daily_override():
     notes = (data.get("notes") or "").strip() or None
 
     if not sector_id or shift not in ("D", "N", "M", "T", "MT"):
-        return jsonify({"error": "Setor/turno inválidos"}), 400
+        return jsonify({"error": "Setor/turno invÃ¡lidos"}), 400
     if role not in ("tecnico", "enfermeiro") or position <= 0:
-        return jsonify({"error": "Role/posição inválidos"}), 400
+        return jsonify({"error": "Role/posiÃ§Ã£o invÃ¡lidos"}), 400
 
     try:
         dt = date.fromisoformat(dt_str)
     except ValueError:
-        return jsonify({"error": "Data inválida (use YYYY-MM-DD)"}), 400
+        return jsonify({"error": "Data invÃ¡lida (use YYYY-MM-DD)"}), 400
 
     if status not in DAY_STATUS:
-        return jsonify({"error": "Status inválido"}), 400
+        return jsonify({"error": "Status invÃ¡lido"}), 400
 
     sched = NursingMonthlySchedule.query.filter_by(
         sector_id=sector_id, year=dt.year, month=dt.month, status="published"
     ).first()
     if not sched:
-        return jsonify({"error": "Escala mensal não publicada para este setor/mês"}), 404
+        return jsonify({"error": "Escala mensal Não publicada para este setor/mÃªs"}), 404
 
     ov = NursingDailyOverride.query.filter_by(
         sector_id=sector_id, date=dt, shift=shift, role=role, position=position
@@ -420,3 +421,6 @@ def set_daily_override():
 
     db.session.commit()
     return jsonify({"ok": True})
+
+
+

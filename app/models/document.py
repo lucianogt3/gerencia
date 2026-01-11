@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from datetime import datetime
 from ..extensions import db
 
@@ -45,3 +45,6 @@ class DocumentRead(db.Model):
     __table_args__ = (
         db.UniqueConstraint("document_id", "user_id", name="uq_doc_user_read"),
     )
+
+
+

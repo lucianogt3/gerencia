@@ -1,4 +1,4 @@
-from functools import wraps
+﻿from functools import wraps
 from flask import abort
 from flask_login import current_user
 
@@ -25,3 +25,6 @@ def require_roles(*roles: str):
             return f(*args, **kwargs)
         return wrapper
     return decorator
+
+
+

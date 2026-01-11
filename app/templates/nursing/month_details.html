@@ -1,0 +1,73 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+<div class="content">
+  <div class="page-head">
+    <div class="page-head-left">
+      <a href="{{ url_for('nursing_ui.year_view', ano=ano) }}" class="back-link">← Voltar para o Ano</a>
+      <h1>📂 {{ month_label }} {{ ano }}</h1>
+      <div class="muted">Gerencie as escalas por setor</div>
+    </div>
+
+    <div class="head-actions">
+      <button class="btn primary" type="button" onclick="openCreateModal()">＋ Criar escala</button>
+    </div>
+  </div>
+
+  <div class="sector-grid">
+    {% for scale in existing_scales %}
+      <a class="sector-card"
+         href="{{ url_for('nursing_ui.editor_view', ano=ano, mes=mes, sector_id=scale.sector_id) }}">
+        <div class="sector-card-top">
+          <div class="sector-icon">🏥</div>
+          <div>
+            <h3>{{ scale.sector_name }}</h3>
+            <div class="sector-meta">
+              <span class="status-dot {{ 'active' if scale.is_published else 'inactive' }}"></span>
+              {{ "Publicada" if scale.is_published else "Rascunho" }}
+            </div>
+          </div>
+        </div>
+
+        <div class="sector-bottom">
+          👥 {{ scale.prof_count }} colaboradores
+        </div>
+      </a>
+    {% endfor %}
+
+    <button class="sector-card add-new" type="button" onclick="openCreateModal()">
+      <div class="add-icon">＋</div>
+      <div class="add-text">Criar Nova Escala</div>
+    </button>
+  </div>
+</div>
+
+<div id="createModal" class="modal-overlay" style="display:none;">
+  <form class="modal-box" action="{{ url_for('nursing_ui.create_scale_action') }}" method="POST">
+    <h3>Nova escala • {{ month_label }}</h3>
+
+    <input type="hidden" name="ano" value="{{ ano }}">
+    <input type="hidden" name="mes" value="{{ mes }}">
+
+    <div class="form-group">
+      <label>Selecione o setor</label>
+      <select name="sector_id" class="input" required>
+        <option value="" disabled selected>-- Escolha um setor --</option>
+        {% for s in available_sectors %}
+          <option value="{{ s.id }}">{{ s.name }}</option>
+        {% endfor %}
+      </select>
+      <small class="muted">Apenas setores sem escala neste mês aparecem aqui.</small>
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn secondary" onclick="closeCreateModal()">Cancelar</button>
+      <button type="submit" class="btn primary">Criar Card</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  function openCreateModal(){ document.getElementById('createModal').style.display='flex'; }
+  function closeCreateModal(){ document.getElementById('createModal').style.display='none'; }
+</script>
+{% endblock %}

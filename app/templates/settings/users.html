@@ -1,100 +1,227 @@
 ﻿{% extends "layouts/base.html" %}
 
 {% block content %}
-  <div class="row">
-    <h1>Configurações • Colaboradores</h1>
+<div class="dash">
+  <!-- Cabeçalho -->
+  <div class="page-head">
+    <div class="page-head-left">
+      <h1>👥 Gerenciar Colaboradores</h1>
+      <div class="muted">
+        Gerencie a equipe, setores, turnos e permissões do sistema
+      </div>
+    </div>
+    <div class="head-actions">
+      <a class="btn" href="{{ url_for('auth.users_pending') }}">
+        👤 Pendentes
+      </a>
+    </div>
   </div>
 
+  <!-- Filtros Modernos -->
   <form class="filters" method="get">
-    <label>Buscar</label>
-    <input class="input" name="q" value="{{ q }}" placeholder="Nome, e-mail ou matrícula...">
+    <div class="form-group">
+      <label>🔍 Buscar</label>
+      <input class="input" name="q" value="{{ q }}"
+             placeholder="Nome, e-mail ou matrícula..."
+             type="search">
+    </div>
 
-    <label>Role</label>
-    <select class="input" name="role">
-      <option value="" {% if not role %}selected{% endif %}>Todos</option>
-      <option value="staff" {% if role == 'staff' %}selected{% endif %}>Staff</option>
-      <option value="nurse" {% if role == 'nurse' %}selected{% endif %}>Enfermeiro</option>
-      <option value="manager" {% if role == 'manager' %}selected{% endif %}>Gerência</option>
-      <option value="admin" {% if role == 'admin' %}selected{% endif %}>Admin</option>
-    </select>
+    <div class="form-group">
+      <label>🎭 Cargo</label>
+      <select class="input" name="role" style="min-width: 120px;">
+        <option value="" {% if not role %}selected{% endif %}>Todos</option>
+        <option value="staff" {% if role == 'staff' %}selected{% endif %}>Staff</option>
+        <option value="technician" {% if role == 'technician' %}selected{% endif %}>Técnico</option>
+        <option value="nurse" {% if role == 'nurse' %}selected{% endif %}>Enfermeiro</option>
+        <option value="manager" {% if role == 'manager' %}selected{% endif %}>Gerência</option>
+        <option value="admin" {% if role == 'admin' %}selected{% endif %}>Admin</option>
+      </select>
+    </div>
 
-    <label>Status</label>
-    <select class="input" name="status">
-      <option value="" {% if not status %}selected{% endif %}>Todos</option>
-      <option value="active" {% if status == 'active' %}selected{% endif %}>Ativo</option>
-      <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Inativo</option>
-    </select>
+    <div class="form-group">
+      <label>📊 Status</label>
+      <select class="input" name="status">
+        <option value="" {% if not status %}selected{% endif %}>Todos</option>
+        <option value="active" {% if status == 'active' %}selected{% endif %}>Ativo</option>
+        <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Inativo</option>
+      </select>
+    </div>
 
-    <button class="btn small" type="submit">Filtrar</button>
+    <div class="form-group">
+      <button class="btn" type="submit" style="margin-top: 6px;">
+        🚀 Filtrar
+      </button>
+    </div>
   </form>
 
-  <table class="table" style="margin-top:12px;">
-    <thead>
-      <tr>
-        <th>Nome</th>
-        <th>Matrícula</th>
-        <th>Role</th>
-        <th>Setor</th>
-        <th>Turno</th>
-        <th>Status</th>
-        <th style="width: 420px;">Ações</th>
-      </tr>
-    </thead>
+  <!-- Tabela de Colaboradores -->
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Equipe Cadastrada</h2>
+        <div class="muted">{{ users|length }} colaboradores encontrados</div>
+      </div>
+    </div>
 
-    <tbody>
-      {% for u in users %}
-        <tr>
-          <td>{{ u.nome }}</td>
-          <td>{{ u.matricula }}</td>
-          <td>{{ u.role }}</td>
-          <td>{{ u.setor or "—" }}</td>
-          <td>{{ u.turno or "—" }}</td>
-          <td>{{ u.status }}</td>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Matrícula</th>
+            <th>Cargo</th>
+            <th>Setor</th>
+            <th>Turno</th>
+            <th>Status</th>
+            <th>Datas</th>
+            <th style="width: 450px;">Ações</th>
+          </tr>
+        </thead>
 
-          <td>
-            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-              <!-- Ativar/Desativar -->
-              <form method="post" action="{{ url_for('settings.users_toggle', user_id=u.id) }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button class="btn small" type="submit">
-                  {{ "Desativar" if u.status == "active" else "Ativar" }}
-                </button>
-              </form>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td>
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 36px; height: 36px; border-radius: 50%;
+                          background: linear-gradient(135deg,
+                          {% if u.status == 'active' %}var(--primary){% else %}#ff4757{% endif %} 0%,
+                          {% if u.status == 'active' %}#8bc2ff{% else %}#ff6b81{% endif %} 100%);
+                          display: flex; align-items: center; justify-content: center;
+                          font-weight: bold; color: white;">
+                  {{ u.nome[0]|upper }}
+                </div>
+                <div>
+                  <strong>{{ u.nome }}</strong><br>
+                  <small class="muted">{{ u.email or "—" }}</small>
+                </div>
+              </div>
+            </td>
 
-              <!-- Atualizar setor/turno/role -->
-              <form method="post"
-                    action="{{ url_for('settings.users_update', user_id=u.id) }}"
-                    style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <td><code>{{ u.matricula }}</code></td>
 
-                <select class="input" name="setor" style="min-width: 160px;">
-                  <option value="">—</option>
-                  {% for s in sectors %}
-                    <option value="{{ s.name }}" {% if u.setor == s.name %}selected{% endif %}>
+            <td>
+              <span class="pill" style="background: rgba(74,125,255,.15);
+                                       border-color: rgba(74,125,255,.3);">
+                {{ ROLE_LABELS.get(u.role, u.role) }}
+              </span>
+            </td>
+
+            <td>{{ u.setor or "—" }}</td>
+
+            <td>
+              {% if u.turno == 'D' %}
+                <span class="pill" style="background: rgba(255,170,0,.15);
+                                         border-color: rgba(255,170,0,.3);">
+                  ☀️ Diurno
+                </span>
+              {% elif u.turno == 'N' %}
+                <span class="pill" style="background: rgba(0,0,0,.2);
+                                         border-color: rgba(255,255,255,.2);">
+                  🌙 Noturno
+                </span>
+              {% else %}
+                —
+              {% endif %}
+            </td>
+
+            <td>
+              {% if u.status == 'active' %}
+                <span class="badge badge-active">
+                  <span class="status-dot active"></span>
+                  Ativo
+                </span>
+              {% else %}
+                <span class="badge badge-inactive">
+                  <span class="status-dot inactive"></span>
+                  Inativo
+                </span>
+              {% endif %}
+            </td>
+
+            <td>
+              <div class="date-info">
+                <div>
+                  <div class="date-label">Cadastro</div>
+                  <div class="date-value">
+                    {{ u.created_at.strftime('%d/%m/%Y') if u.created_at else '—' }}
+                  </div>
+                </div>
+                {% if u.status == 'inactive' and u.inactivated_at %}
+                <div>
+                  <div class="date-label">Inativado em</div>
+                  <div class="date-value">
+                    {{ u.inactivated_at.strftime('%d/%m/%Y') }}
+                  </div>
+                </div>
+                {% endif %}
+              </div>
+            </td>
+
+            <td>
+              <div class="actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <!-- Botão Ativar/Desativar -->
+                <form method="post"
+                      action="{{ url_for('settings.users_toggle', user_id=u.id) }}"
+                      style="display: inline;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  {% if u.status == 'active' %}
+                    <button class="btn-status btn-inactive"
+                            type="submit"
+                            onclick="return confirm('Tem certeza que deseja DESATIVAR {{ u.nome }}?')">
+                      🚫 Desativar
+                    </button>
+                  {% else %}
+                    <button class="btn-status btn-active"
+                            type="submit"
+                            onclick="return confirm('Tem certeza que deseja ATIVAR {{ u.nome }}?')">
+                      ✅ Ativar
+                    </button>
+                  {% endif %}
+                </form>
+
+                <!-- Atualizar setor/turno/role -->
+                <form method="post"
+                      action="{{ url_for('settings.users_update', user_id=u.id) }}"
+                      style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                  <select class="input" name="setor" style="min-width: 120px;">
+                    <option value="">— Setor —</option>
+                    {% for s in sectors %}
+                    <option value="{{ s.name }}"
+                            {% if u.setor == s.name %}selected{% endif %}>
                       {{ s.name }}
                     </option>
-                  {% endfor %}
-                </select>
+                    {% endfor %}
+                  </select>
 
-                <select class="input" name="turno" style="width: 90px;">
-                  <option value="">—</option>
-                  <option value="D" {% if u.turno == 'D' %}selected{% endif %}>D</option>
-                  <option value="N" {% if u.turno == 'N' %}selected{% endif %}>N</option>
-                </select>
+                  <select class="input" name="turno" style="width: 90px;">
+                    <option value="">— Turno —</option>
+                    <option value="D" {% if u.turno == 'D' %}selected{% endif %}>D</option>
+                    <option value="N" {% if u.turno == 'N' %}selected{% endif %}>N</option>
+                  </select>
 
-                <select class="input" name="role" style="min-width: 130px;">
-                  <option value="staff" {% if u.role == 'staff' %}selected{% endif %}>staff</option>
-                  <option value="nurse" {% if u.role == 'nurse' %}selected{% endif %}>nurse</option>
-                  <option value="manager" {% if u.role == 'manager' %}selected{% endif %}>manager</option>
-                  <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>admin</option>
-                </select>
+                  <select class="input" name="role" style="min-width: 120px;">
+                    <option value="staff" {% if u.role == 'staff' %}selected{% endif %}>Staff</option>
+                    <option value="technician" {% if u.role == 'technician' %}selected{% endif %}>Técnico</option>
+                    <option value="nurse" {% if u.role == 'nurse' %}selected{% endif %}>Enfermeiro</option>
+                    <option value="manager" {% if u.role == 'manager' %}selected{% endif %}>Gerência</option>
+                    <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>Admin</option>
+                  </select>
 
-                <button class="btn small" type="submit">Salvar</button>
-              </form>
-            </div>
-          </td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+                  <button class="btn small" type="submit" style="background: rgba(74,125,255,.2);
+                                                                border: 1px solid rgba(74,125,255,.3);">
+                    💾 Salvar
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 {% endblock %}

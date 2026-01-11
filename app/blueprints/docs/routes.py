@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, send_from_directory, current_app, abort
+﻿from flask import Blueprint, render_template, redirect, url_for, flash, request, send_from_directory, current_app, abort
 from flask_login import login_required, current_user
 from ...utils.security import require_active, require_roles
 from ...utils.uploads import save_upload
@@ -40,7 +40,7 @@ def upload():
             tipo=form.tipo.data,
             setor=(form.setor.data or "").strip() or None,
             tags=(form.tags.data or "").strip() or None,
-            status="approved",  # por enquanto, já aprova (você pode mudar p/ review depois)
+            status="approved",  # por enquanto, jÃ¡ aprova (vocÃª pode mudar p/ review depois)
             created_by_id=current_user.id,
         )
         db.session.add(doc)
@@ -72,7 +72,7 @@ def view(doc_id: int):
     if not doc.current_version_id:
         abort(404)
 
-    # registra abertura/leitura automática
+    # registra abertura/leitura automÃ¡tica
     register_open(doc_id, current_user.id)
 
     version = DocumentVersion.query.get(doc.current_version_id)
@@ -90,7 +90,7 @@ def file(filename: str):
 @require_active
 @require_roles("manager", "admin")
 def report():
-    # relatório simples de leituras/aberturas por doc
+    # Relatório simples de leituras/aberturas por doc
     docs = Document.query.order_by(Document.updated_at.desc()).all()
     reads = DocumentRead.query.all()
     reads_by_doc = {}
@@ -98,3 +98,6 @@ def report():
         reads_by_doc.setdefault(r.document_id, [])
         reads_by_doc[r.document_id].append(r)
     return render_template("docs/report.html", docs=docs, reads_by_doc=reads_by_doc)
+
+
+

@@ -1,43 +1,242 @@
-{% extends "layouts/base.html" %}
-{% block content %}
-  <h1>Painel</h1>
+﻿{% extends "layouts/base.html" %}
 
-  <div class="cards">
-    <div class="card">
-      <div class="card-title">Meu ID/Matrícula</div>
-      <div class="card-value">{{ current_user.matricula }}</div>
-      <div class="muted">{{ current_user.nome }} • {{ current_user.setor or "—" }} • {{ current_user.turno or "—" }}</div>
+{% block content %}
+  <div class="dash">
+
+    <!-- Cabeçalho -->
+    <div class="page-head">
+      <div class="page-head-left">
+        <h1>Painel</h1>
+        <div class="muted">
+          {{ current_user.nome }} • {{ current_user.matricula }}
+          {% if current_user.setor %} • {{ current_user.setor }}{% endif %}
+          {% if current_user.turno %} • {{ current_user.turno }}{% endif %}
+        </div>
+      </div>
+
+      <div class="head-actions">
+        <a class="btn" href="{{ url_for('nursing_ui.daily_page') }}">Escala Diária</a>
+
+        {% if current_user.role in ["manager","admin"] %}
+          <a class="btn secondary" href="{{ url_for('nursing_ui.monthly_page') }}">Escala Mensal</a>
+          <a class="btn secondary" href="{{ url_for('settings.sectors') }}">Configurações</a>
+        {% endif %}
+
+        <!-- Perfil em página própria -->
+        <a class="btn secondary" href="{{ url_for('settings.profile') }}">Meu perfil</a>
+      </div>
     </div>
-    <div class="card">
-      <div class="card-title">Acesso</div>
-      <div class="card-value">{{ current_user.role }}</div>
-      <div class="muted">Status: {{ current_user.status }}</div>
+
+    <!-- KPIs (operacional) -->
+    <div class="kpis">
+      {% if current_user.role in ["manager","admin"] %}
+        <div class="card kpi">
+          <div class="card-title">Pendências</div>
+          <div class="kpi-value">{{ pending_count or 0 }}</div>
+          <div class="muted">Solicitações de acesso</div>
+        </div>
+      {% endif %}
+
+      <div class="card kpi">
+        <div class="card-title">Avisos</div>
+        <div class="kpi-value">{{ announcements|length if announcements else 0 }}</div>
+        <div class="muted">Comunicados ativos</div>
+      </div>
+
+      <div class="card kpi">
+        <div class="card-title">Aniversariantes</div>
+        <div class="kpi-value">{{ aniversariantes|length if aniversariantes else 0 }}</div>
+        <div class="muted">Este mês</div>
+      </div>
+    </div>
+
+    <!-- Grid principal -->
+    <div class="dash-grid">
+
+      <!-- ESQUERDA -->
+      <div class="dash-left">
+
+        {% if current_user.role in ["manager","admin"] %}
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Solicitações de acesso</h2>
+                <div class="muted">Aprove ou bloqueie usuários pendentes</div>
+              </div>
+              <a class="btn small secondary" href="{{ url_for('auth.users_pending') }}">Ver todas</a>
+            </div>
+
+            {% if pending_list and pending_list|length > 0 %}
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Nome</th>
+                      <th>Matrícula</th>
+                      <th>E-mail</th>
+                      <th>Setor</th>
+                      <th>Turno</th>
+                      <th style="width:240px;">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for u in pending_list %}
+                      <tr>
+                        <td><strong>{{ u.nome }}</strong></td>
+                        <td>{{ u.matricula }}</td>
+                        <td class="muted">{{ u.email or "—" }}</td>
+                        <td>{{ u.setor or "—" }}</td>
+                        <td>{{ u.turno or "—" }}</td>
+                        <td class="actions">
+                          <form method="post" action="{{ url_for('auth.approve_user', user_id=u.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="btn small" type="submit">Aprovar</button>
+                          </form>
+
+                          <form method="post" action="{{ url_for('auth.block_user', user_id=u.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="btn small secondary" type="submit">Bloquear</button>
+                          </form>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+
+              {% if pending_count and pending_count > (pending_list|length) %}
+                <p class="muted" style="margin-top:10px;">
+                  Mostrando {{ pending_list|length }} de {{ pending_count }} pendentes.
+                </p>
+              {% endif %}
+            {% else %}
+              <p class="muted" style="margin-top:10px;">Nenhuma solicitação pendente.</p>
+            {% endif %}
+          </section>
+        {% endif %}
+
+        <!-- Atalhos em cards -->
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Atalhos</h2>
+              <div class="muted">Ações principais do sistema</div>
+            </div>
+          </div>
+
+          <div class="quick-actions">
+  {% if current_user.role in ["manager","admin"] %}
+    <a class="qa" href="{{ url_for('nursing_ui.monthly_page') }}">
+      <div class="qa-emoji"><i data-lucide="calendar-range"></i></div>
+      <div>
+        <div class="qa-title">Escala Mensal</div>
+        <div class="qa-desc">Criar, editar e publicar por setor</div>
+      </div>
+    </a>
+  {% endif %}
+
+  <a class="qa" href="{{ url_for('nursing_ui.daily_page') }}">
+    <div class="qa-emoji"><i data-lucide="calendar-days"></i></div>
+    <div>
+      <div class="qa-title">Escala Diária</div>
+      <div class="qa-desc">Falta • Atestado • Remanejamento • Extra/Folga</div>
+    </div>
+  </a>
+
+  <a class="qa" href="{{ url_for('announcements.index') }}">
+    <div class="qa-emoji"><i data-lucide="file-text"></i></div>
+    <div>
+      <div class="qa-title">Documentos</div>
+      <div class="qa-desc">POPs, protocolos, comunicados</div>
+    </div>
+  </a>
+
+  <a class="qa" href="{{ url_for('swaps.index') }}">
+    <div class="qa-emoji"><i data-lucide="repeat-2"></i></div>
+    <div>
+      <div class="qa-title">Trocas</div>
+      <div class="qa-desc">Solicitações e histórico</div>
+    </div>
+  </a>
+
+  <a class="qa" href="{{ url_for('indicators.index') }}">
+    <div class="qa-emoji"><i data-lucide="bar-chart-3"></i></div>
+    <div>
+      <div class="qa-title">Indicadores</div>
+      <div class="qa-desc">Painéis e relatórios</div>
+    </div>
+  </a>
+
+  {% if current_user.role in ["manager","admin"] %}
+    <a class="qa" href="{{ url_for('settings.users') }}">
+      <div class="qa-emoji"><i data-lucide="users"></i></div>
+      <div>
+        <div class="qa-title">Colaboradores</div>
+        <div class="qa-desc">Ativar/Inativar • setor • turno • perfil</div>
+      </div>
+    </a>
+  {% endif %}
+</div>
+
+
+      <!-- DIREITA -->
+      <div class="dash-right">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Avisos</h2>
+              <div class="muted">Comunicados da gerência</div>
+            </div>
+            <a class="btn small secondary" href="{{ url_for('announcements.index') }}">Ver todos</a>
+          </div>
+
+          {% if announcements %}
+            <ul class="list">
+              {% for a in announcements %}
+                <li class="list-item">
+                  <div class="list-top">
+                    <strong class="tag">[{{ a.tipo|upper }}]</strong>
+                    <span class="list-title">{{ a.title }}</span>
+                    {% if a.setor %}<span class="pill">{{ a.setor }}</span>{% endif %}
+                  </div>
+                  {% if a.body %}<div class="muted">{{ a.body }}</div>{% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="muted">Nenhum aviso ainda.</p>
+          {% endif %}
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Aniversariantes do mês</h2>
+              <div class="muted">Equipe cadastrada</div>
+            </div>
+          </div>
+
+          {% if aniversariantes %}
+            <ul class="list">
+              {% for u in aniversariantes %}
+                <li class="list-item">
+                  <div class="list-top">
+                    <strong>{{ u.nascimento.strftime('%d/%m') }}</strong>
+                    <span class="list-title">{{ u.nome }}</span>
+                    {% if u.setor %}<span class="pill">{{ u.setor }}</span>{% endif %}
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="muted">Nenhum aniversariante cadastrado neste mês.</p>
+          {% endif %}
+        </section>
+      </div>
+
     </div>
   </div>
-
-  <h2>Avisos</h2>
-  {% if announcements %}
-    <ul class="list">
-      {% for a in announcements %}
-        <li>
-          <strong>[{{ a.tipo|upper }}]</strong> {{ a.title }}
-          {% if a.setor %}<span class="pill">{{ a.setor }}</span>{% endif %}
-          <div class="muted">{{ a.body or "" }}</div>
-        </li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p class="muted">Nenhum aviso ainda.</p>
-  {% endif %}
-
-  <h2>Aniversariantes do mês</h2>
-  {% if aniversariantes %}
-    <ul class="list">
-      {% for u in aniversariantes %}
-        <li>{{ u.nascimento.strftime('%d/%m') }} — {{ u.nome }} {% if u.setor %}<span class="pill">{{ u.setor }}</span>{% endif %}</li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p class="muted">Nenhum aniversariante cadastrado neste mês.</p>
-  {% endif %}
 {% endblock %}
+
+
+

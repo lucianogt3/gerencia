@@ -1,0 +1,20 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+<div class="content">
+  <div class="page-head">
+    <div class="page-head-left">
+      <h1>📅 Escalas {{ ano }}</h1>
+      <div class="muted">Selecione o mês</div>
+    </div>
+  </div>
+
+  <div class="months-grid">
+    {% for m in months_list %}
+      <a class="month-card" href="{{ url_for('nursing_ui.month_details', ano=ano, mes=m.num) }}">
+        <div class="month-title">{{ m.name }}</div>
+        <div class="month-meta">{{ m.active_scales_count }} escalas</div>
+      </a>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

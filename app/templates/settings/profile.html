@@ -1,0 +1,34 @@
+{% extends "layouts/base.html" %}
+
+{% block content %}
+  <div class="page-head">
+    <div>
+      <h1>Meu perfil</h1>
+      <div class="muted">Informações da sua conta</div>
+    </div>
+
+    <div class="head-actions">
+      <a class="btn secondary" href="{{ url_for('main.dashboard') }}">Voltar ao painel</a>
+    </div>
+  </div>
+
+  <div class="grid-cards">
+    <div class="card">
+      <div class="card-title">Nome</div>
+      <div class="card-value">{{ user.nome }}</div>
+      <div class="muted">Matrícula: {{ user.matricula }}</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Setor</div>
+      <div class="card-value">{{ user.setor or "—" }}</div>
+      <div class="muted">Turno: {{ user.turno or "—" }}</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Perfil</div>
+      <div class="card-value">{{ user.role }}</div>
+      <div class="muted">Status: {{ user.status }}</div>
+    </div>
+  </div>
+{% endblock %}

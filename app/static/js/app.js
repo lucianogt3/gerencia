@@ -1,1 +1,2 @@
-console.log('Portal Gerência de Enfermagem carregado');
+﻿console.log('Portal GerÃªncia de Enfermagem carregado');
+

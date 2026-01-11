@@ -150,4 +150,7 @@ def users_update(user_id: int):
     flash("Dados do colaborador atualizados.", "success")
     return redirect(url_for("settings.users"))
 
-
+@bp.get("/profile")
+@login_required
+def profile():
+    return render_template("settings/profile.html", user=current_user)

@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import datetime
 from ..extensions import db
 
 class Shift(db.Model):
@@ -12,8 +12,11 @@ class Shift(db.Model):
     # exemplos:
     # D  -> Diurno
     # N  -> Noturno
-    # M  -> Manhã
+    # M  -> ManhÃ£
     # T  -> Tarde
-    # MT -> Manhã/Tarde
+    # MT -> ManhÃ£/Tarde
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+

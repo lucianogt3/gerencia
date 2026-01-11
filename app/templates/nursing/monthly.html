@@ -1,18 +1,132 @@
 ﻿{% extends "layouts/base.html" %}
 {% block content %}
-<h1>Escala Mensal</h1>
 
-<div class="card">
-  <p class="muted">
-    Gerenciamento da escala mensal por setor, mês e ano.
-  </p>
+<div class="dash nursing-monthly">
+
+  <!-- Cabeçalho -->
+  <div class="page-head">
+    <div class="page-head-left">
+      <h1>📅 Escalas Mensais</h1>
+      <div class="muted">
+        Unidade: {{ unidade_nome or "—" }}
+        {% if active_sector %} • Setor: {{ active_sector.name }}{% endif %}
+      </div>
+    </div>
+
+    <div class="head-actions">
+      <button class="btn" type="button" disabled title="Em breve: exportar PDF">
+        ⬇ Exportar PDF
+      </button>
+
+      {% if current_user.role in ['manager','admin'] %}
+        <button class="btn primary" type="button" disabled title="Em breve: novo plantão">
+          ＋ Novo Plantão
+        </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Seletor de Setor -->
+  <div class="sector-tabs">
+    {% for sec in sectors %}
+      <a
+        class="tab {% if sec.id == active_sector_id %}active{% endif %}"
+        href="{{ url_for('nursing_ui.monthly_page', sector_id=sec.id, ano=ano, mes=mes, q=q) }}"
+        title="Abrir {{ sec.name }}"
+      >
+        {{ sec.name }}
+      </a>
+    {% endfor %}
+  </div>
+
+  <!-- Controles: mês + busca -->
+  <div class="controls-card">
+    <div class="month-nav">
+      <a class="icon-btn"
+         href="{{ url_for('nursing_ui.monthly_page', sector_id=active_sector_id, ano=prev_ano, mes=prev_mes, q=q) }}"
+         title="Mês anterior">‹</a>
+
+      <div class="month-title">{{ month_label }} {{ ano }}</div>
+
+      <a class="icon-btn"
+         href="{{ url_for('nursing_ui.monthly_page', sector_id=active_sector_id, ano=next_ano, mes=next_mes, q=q) }}"
+         title="Próximo mês">›</a>
+    </div>
+
+    <form class="searchbar" method="get" action="{{ url_for('nursing_ui.monthly_page') }}">
+      <input type="hidden" name="sector_id" value="{{ active_sector_id }}">
+      <input type="hidden" name="ano" value="{{ ano }}">
+      <input type="hidden" name="mes" value="{{ mes }}">
+      <input class="input" name="q" value="{{ q or '' }}" placeholder="Buscar profissional (nome, função, matrícula)..." />
+      <button class="icon-btn" type="submit" title="Buscar">🔎</button>
+    </form>
+  </div>
+
+  <!-- Tabela mensal -->
+  <div class="grid-card">
+    <div class="grid-scroll">
+      <table class="month-grid">
+        <thead>
+          <tr>
+            <th class="sticky-col">Profissional</th>
+            {% for d in days %}
+              <th class="day-head {% if d.is_weekend %}weekend{% endif %}">
+                {{ "%02d"|format(d.day) }}
+              </th>
+            {% endfor %}
+          </tr>
+        </thead>
+
+        <tbody>
+          {% if not professionals %}
+            <tr>
+              <td class="empty" colspan="{{ (days|length) + 1 }}">
+                Nenhum profissional encontrado.
+              </td>
+            </tr>
+          {% else %}
+            {% for p in professionals %}
+              <tr>
+                <td class="sticky-col">
+                  <div class="pname">{{ p.name }}</div>
+                  <div class="prole">
+                    {{ p.role_label or p.role or "—" }}
+                    {% if p.matricula %} • {{ p.matricula }}{% endif %}
+                    {% if p.turno %} • {{ p.turno }}{% endif %}
+                  </div>
+                </td>
+
+                {% for d in days %}
+                  {% set code = (cell_map.get(p.user_id, {}).get(d.day, '')) %}
+                  <td class="cell {% if d.is_weekend %}weekend{% endif %}">
+                    {% if code %}
+                      <a class="chip chip-{{ code|lower }}" href="javascript:void(0)" title="Dia {{ d.day }} • {{ code }}">
+                        {{ code }}
+                      </a>
+                    {% else %}
+                      <span class="chip chip-empty">—</span>
+                    {% endif %}
+                  </td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Legenda -->
+    <div class="legend">
+      <span class="lg"><span class="dot dot-m"></span> M: Manhã</span>
+      <span class="lg"><span class="dot dot-t"></span> T: Tarde</span>
+      <span class="lg"><span class="dot dot-n"></span> N: Noite</span>
+      <span class="lg"><span class="dot dot-d"></span> D: Diurno</span>
+      <span class="lg"><span class="dot dot-f"></span> F: Folga</span>
+      <span class="lg"><span class="dot dot-fe"></span> FE: Férias</span>
+      <span class="lg"><span class="dot dot-at"></span> AT: Atestado</span>
+    </div>
+  </div>
+
 </div>
 
-<div id="monthly-root" class="card">
-  <p>Interface mensal (consome /api/nursing/monthly).</p>
-</div>
 {% endblock %}
-
-
-
-

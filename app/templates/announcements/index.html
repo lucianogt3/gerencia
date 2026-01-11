@@ -1,19 +1,119 @@
-{% extends "layouts/base.html" %}
-{% block content %}
-  {% if current_user.role in ["manager","admin"] %}
-    <div style="margin-bottom:12px;">
-      <a class="btn" href="{{ url_for('announcements.new') }}">+ Novo aviso</a>
-    </div>
-  {% endif %}
+﻿{% extends "layouts/base.html" %}
 
-  <div style="display:grid; gap:10px;">
-    {% for a in items %}
-      <a class="card" style="text-decoration:none; color:inherit;"
-         href="{{ url_for('announcements.detail', announcement_id=a.id) }}">
-        <div style="font-weight:900;">[{{ a.tipo|upper }}] {{ a.title }}</div>
-        {% if a.setor %}<div class="muted">Setor: {{ a.setor }}</div>{% endif %}
-        {% if a.body %}<div class="muted">{{ a.body }}</div>{% endif %}
+{% block content %}
+<div class="dash">
+  <div class="page-head">
+    <div class="page-head-left">
+      <h1>Comunicados</h1>
+      <div class="muted">Comunicados da gerência para a equipe</div>
+    </div>
+    
+    {% if current_user.role in ["admin","manager"] %}
+    <div class="head-actions">
+      <a class="btn" href="{{ url_for('announcements.new') }}">
+        Novo Comunicado
       </a>
-    {% endfor %}
+    </div>
+    {% endif %}
   </div>
+
+  <!-- Filtros -->
+  <form class="filters" method="get">
+    <div class="form-group">
+      <label>Tipo</label>
+      <select class="input" name="tipo">
+        <option value="">Todos</option>
+        <option value="geral">Geral</option>
+        <option value="urgente">Urgente</option>
+        <option value="informativo">Informativo</option>
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label>Setor</label>
+      <select class="input" name="setor">
+        <option value="">Todos</option>
+        {% for s in sectors %}
+        <option value="{{ s.name }}">{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <button class="btn small" type="submit">Filtrar</button>
+    </div>
+  </form>
+
+  <!-- Lista de Comunicados -->
+  <div class="panel">
+    {% if announcements %}
+      {% for a in announcements %}
+      <div class="list-item" style="margin-bottom: 20px;">
+        <div class="list-top">
+          <strong class="tag" style="background: 
+            {% if a.tipo == 'urgente' %}var(--danger-bg){% elif a.tipo == 'informativo' %}var(--info-bg){% else %}var(--warning-bg){% endif %};
+            color: {% if a.tipo == 'urgente' %}var(--danger){% elif a.tipo == 'informativo' %}var(--info){% else %}var(--warning){% endif %};
+            border-color: {% if a.tipo == 'urgente' %}var(--danger-border){% elif a.tipo == 'informativo' %}var(--info-border){% else %}var(--warning-border){% endif %};">
+            {{ a.tipo|upper }}
+          </strong>
+          
+          <span class="list-title">{{ a.title }}</span>
+          
+          {% if a.setor %}
+          <span class="pill">{{ a.setor }}</span>
+          {% endif %}
+          
+          <span class="muted" style="margin-left: auto; font-size: 12px;">
+            {{ a.created_at.strftime('%d/%m/%Y %H:%M') }}
+          </span>
+        </div>
+        
+        <div class="muted" style="margin-top: 8px; white-space: pre-line;">{{ a.content }}</div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
+          <small class="muted">
+            Por: {{ a.user.nome }} â€¢ Atualizado: {{ a.updated_at.strftime('%d/%m/%Y') }}
+          </small>
+          
+          {% if current_user.role in ["admin","manager"] or a.user_id == current_user.id %}
+          <div style="display: flex; gap: 8px;">
+            <a class="btn small secondary" 
+               href="{{ url_for('announcements.edit', id=a.id) }}">
+              âœï¸ Editar
+            </a>
+            
+            <form method="post" 
+                  action="{{ url_for('announcements.delete', id=a.id) }}"
+                  onsubmit="return confirm('Excluir este comunicado?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn small secondary" type="submit">
+                ðŸ—‘ï¸ Excluir
+              </button>
+            </form>
+            
+            <form method="post" 
+                  action="{{ url_for('announcements.toggle', id=a.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn small {% if a.active %}secondary{% endif %}" type="submit">
+                {% if a.active %}â¸ï¸ Desativar{% else %}â–¶ï¸ Ativar{% endif %}
+              </button>
+            </form>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="text-align: center; padding: 40px;">
+        <p class="muted">Nenhum comunicado encontrado.</p>
+        
+        {% if current_user.role in ["admin","manager"] %}
+        <a class="btn" href="{{ url_for('announcements.new') }}" style="margin-top: 20px;">
+          Criar primeiro comunicado
+        </a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+</div>
 {% endblock %}

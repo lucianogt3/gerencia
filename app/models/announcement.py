@@ -1,21 +1,19 @@
-from __future__ import annotations
+﻿from app.extensions import db
 from datetime import datetime
-from ..extensions import db
 
 class Announcement(db.Model):
     __tablename__ = "announcements"
 
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
-    body = db.Column(db.Text, nullable=True)
-    tipo = db.Column(db.String(20), default="info", nullable=False)  # info/alert/urgent
-
-    setor = db.Column(db.String(80), nullable=True)  # null => todos
-    image_filename = db.Column(db.String(255), nullable=True)
-    image_original_name = db.Column(db.String(255), nullable=True)
-
-    is_pinned = db.Column(db.Boolean, default=False, nullable=False)
-    pinned_until = db.Column(db.DateTime, nullable=True)
-
-    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    title = db.Column(db.String(120), nullable=False)
+    body = db.Column(db.Text, nullable=False) # No HTML está 'content', mudei para body
+    tipo = db.Column(db.String(20), nullable=False, default="info")
+    setor = db.Column(db.String(50))
+    is_pinned = db.Column(db.Boolean, default=False)
+    active = db.Column(db.Boolean, default=True) # ADICIONE ISSO
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow) # ADICIONE ISSO
+    
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    # Relacionamento para o HTML conseguir usar a.user.nome
+    user = db.relationship('User', backref='my_announcements')

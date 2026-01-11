@@ -1,4 +1,4 @@
-import os
+﻿import os
 import secrets
 from werkzeug.utils import secure_filename
 from flask import current_app
@@ -14,7 +14,7 @@ def save_upload(file_storage, subdir: str = "", allowed_exts=None) -> tuple[str,
     filename = secure_filename(original)
     _, ext = os.path.splitext(filename.lower())
     if ext not in allowed_exts:
-        raise ValueError(f"Tipo de arquivo não permitido: {ext}")
+        raise ValueError(f"Tipo de arquivo Não permitido: {ext}")
 
     token = secrets.token_hex(8)
     stored = f"{token}{ext}"
@@ -28,3 +28,6 @@ def save_upload(file_storage, subdir: str = "", allowed_exts=None) -> tuple[str,
     file_storage.save(path)
 
     return stored, original
+
+
+

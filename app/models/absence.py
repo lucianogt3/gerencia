@@ -1,4 +1,4 @@
-from datetime import date, datetime
+﻿from datetime import date, datetime
 from ..extensions import db
 
 class Absence(db.Model):
@@ -14,3 +14,6 @@ class Absence(db.Model):
     aprovado_por = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+

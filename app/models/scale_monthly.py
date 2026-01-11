@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import datetime
 from ..extensions import db
 
 class ScaleMonthly(db.Model):
@@ -15,3 +15,6 @@ class ScaleMonthly(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+

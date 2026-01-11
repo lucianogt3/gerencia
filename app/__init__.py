@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 from flask import Flask
@@ -7,6 +7,14 @@ from dotenv import load_dotenv
 from .config import Config
 from .extensions import db, login_manager, csrf
 
+# ✅ Labels PT-BR para roles (disponível em TODOS os templates)
+ROLE_LABELS = {
+    "staff": "Staff",
+    "technician": "Técnico",
+    "nurse": "Enfermeiro",
+    "manager": "Gerência",
+    "admin": "Admin",
+}
 
 def create_app() -> Flask:
     load_dotenv()
@@ -39,7 +47,13 @@ def create_app() -> Flask:
 
     login_manager.login_view = "auth.login"
 
+    # ✅ Injeta variáveis globais nos templates (Jinja)
+    @app.context_processor
+    def inject_globals():
+        return dict(ROLE_LABELS=ROLE_LABELS)
+
     # register blueprints
+    from .blueprints.settings import bp as settings_bp
     from .blueprints.main.routes import main_bp
     from .blueprints.auth.routes import auth_bp
     from .blueprints.docs.routes import docs_bp
@@ -47,11 +61,11 @@ def create_app() -> Flask:
     from .blueprints.indicators.routes import indicators_bp
     from .blueprints.swaps.routes import swaps_bp
     from .blueprints.sick_notes.routes import sick_notes_bp
+    from .blueprints.nursing_ui import bp as nursing_ui_bp
+    from .blueprints.announcements.routes import bp as announcements_bp
 
-    # NOVO: API da escala mensal/diária (se você criou o arquivo que eu te passei)
-    # Se ainda não criou, comente essas 2 linhas por enquanto.
+    # NOVO: API da escala mensal/diária (se existir no seu projeto)
     from .blueprints.nursing import bp as nursing_api_bp
-
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
@@ -61,15 +75,17 @@ def create_app() -> Flask:
     app.register_blueprint(swaps_bp)
     app.register_blueprint(sick_notes_bp)
     app.register_blueprint(nursing_api_bp)
+    app.register_blueprint(nursing_ui_bp)
+    app.register_blueprint(settings_bp)
+    app.register_blueprint(announcements_bp)
 
-    # create db tables
     with app.app_context():
         # garante que todos os models sejam importados/registrados no metadata
         from . import models  # noqa: F401
         db.create_all()
 
-    # CLI commands
-    from .seed import register_seed_command
-    register_seed_command(app)
+    # ✅ CLI commands (SEED)
+    from .seed import seed_command
+    app.cli.add_command(seed_command)
 
     return app

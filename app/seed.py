@@ -1,32 +1,81 @@
-from __future__ import annotations
+﻿from __future__ import annotations
+
+from datetime import date
 import click
-from flask import Flask
+from flask import current_app
+from sqlalchemy import text
+
 from .extensions import db
 from .models.user import User
 
-def register_seed_command(app: Flask):
-    @app.cli.command("seed")
-    def seed():
-        """Cria usuários de teste (gerência + colaborador)."""
-        created = 0
+DEFAULT_BIRTH = date(1990, 1, 1)
 
-        def upsert_user(matricula, nome, email, role, status):
-            nonlocal created
-            u = User.query.filter_by(matricula=matricula).first()
-            if not u:
-                u = User(matricula=matricula, nome=nome, email=email, role=role, status=status)
-                u.set_password("admin123")
-                db.session.add(u)
-                created += 1
-            else:
-                u.nome = nome
-                u.email = email
-                u.role = role
-                u.status = status
-            return u
+ALLOWED_ROLES = {"staff", "technician", "nurse", "manager", "admin"}
 
-        upsert_user("9001", "Gerência", "gerencia@local", "manager", "active")
-        upsert_user("1001", "Colaborador", "colab@local", "staff", "active")
 
-        db.session.commit()
-        click.echo(f"Seed concluído. Usuários criados/atualizados: {created}")
+@click.command("seed")
+def seed_command():
+    """Cria/atualiza usuários seed e garante nascimento (NOT NULL)."""
+    created = 0
+    updated = 0
+
+    # 1) Corrige qualquer registro antigo que esteja com nascimento NULL (defensivo)
+    db.session.execute(
+        text("UPDATE users SET nascimento = :d WHERE nascimento IS NULL"),
+        {"d": DEFAULT_BIRTH.isoformat()},
+    )
+    db.session.commit()
+
+    def upsert_user(
+        matricula: str,
+        nome: str,
+        email: str | None,
+        role: str,
+        status: str,
+        nascimento: date | None = None,
+        password: str = "admin123",
+    ):
+        nonlocal created, updated
+
+        # blindagem total (nunca deixa None)
+        if nascimento is None:
+            nascimento = DEFAULT_BIRTH
+
+        if role not in ALLOWED_ROLES:
+            role = "staff"
+
+        u = User.query.filter_by(matricula=matricula).first()
+
+        if not u:
+            u = User(
+                matricula=matricula,
+                nome=nome,
+                email=email,
+                role=role,
+                status=status,
+                nascimento=nascimento,
+            )
+            u.set_password(password)
+            db.session.add(u)
+            created += 1
+        else:
+            u.nome = nome
+            u.email = email
+            u.role = role
+            u.status = status
+
+            # se tiver vazio, seta
+            if u.nascimento is None:
+                u.nascimento = nascimento
+
+            updated += 1
+
+        return u
+
+    # Seeds (um em cima do outro)
+    upsert_user("9001", "Gerência", "gerencia@local", "manager", "active", date(1989, 3, 26))
+    upsert_user("1001", "Colaborador", "colab@local", "staff", "active", date(1995, 1, 1))
+    upsert_user("0005", "Colaborador Staff", "staff@local", "staff", "active", date(1990, 1, 1))
+
+    db.session.commit()
+    click.echo(f"Seed concluído. Criados: {created} | Atualizados: {updated}")

@@ -1,30 +1,54 @@
-{% extends "layouts/base.html" %}
+﻿{% extends "layouts/base.html" %}
 {% block content %}
-  <h1>Usuários pendentes</h1>
-  <table class="table">
-    <thead>
-      <tr><th>Nome</th><th>Matrícula</th><th>Setor</th><th>Turno</th><th>Status</th><th>Ações</th></tr>
-    </thead>
-    <tbody>
-      {% for u in pending %}
-        <tr>
-          <td>{{ u.nome }}</td>
-          <td>{{ u.matricula }}</td>
-          <td>{{ u.setor or "-" }}</td>
-          <td>{{ u.turno or "-" }}</td>
-          <td>{{ u.status }}</td>
-          <td class="actions">
-            <form method="post" action="{{ url_for('auth.approve_user', user_id=u.id) }}" style="display:inline;">
-              {{ csrf_token() }}
-              <button class="btn small" type="submit">Aprovar</button>
-            </form>
-            <form method="post" action="{{ url_for('auth.block_user', user_id=u.id) }}" style="display:inline;">
-              {{ csrf_token() }}
-              <button class="btn small danger" type="submit">Bloquear</button>
-            </form>
-          </td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="row" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+    <div>
+      <h1>Solicitações de acesso</h1>
+      <p class="muted">Aprove ou bloqueie os cadastros pendentes.</p>
+    </div>
+    <a class="btn btn-outline" href="{{ url_for('main.dashboard') }}">Voltar ao painel</a>
+  </div>
+
+  <div class="card" style="margin-top:12px;">
+    {% if pending and pending|length > 0 %}
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Matrícula</th>
+            <th>E-mail</th>
+            <th>Setor</th>
+            <th>Turno</th>
+            <th>Nascimento</th>
+            <th>Status</th>
+            <th style="width:220px;">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in pending %}
+          <tr>
+            <td>{{ u.nome }}</td>
+            <td>{{ u.matricula }}</td>
+            <td>{{ u.email or "—" }}</td>
+            <td>{{ u.setor or "—" }}</td>
+            <td>{{ u.turno or "—" }}</td>
+            <td>{{ u.nascimento.strftime("%d/%m/%Y") if u.nascimento else "—" }}</td>
+            <td><span class="pill">{{ u.status }}</span></td>
+            <td style="display:flex; gap:8px;">
+              <form method="post" action="{{ url_for('auth.approve_user', user_id=u.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn small" type="submit">Aprovar</button>
+              </form>
+              <form method="post" action="{{ url_for('auth.block_user', user_id=u.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn small btn-outline" type="submit">Bloquear</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="muted">Nenhuma solicitação pendente.</div>
+    {% endif %}
+  </div>
 {% endblock %}

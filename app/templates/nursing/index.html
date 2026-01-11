@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="nursing-monthly">
+    <div class="page-head">
+        <div class="page-head-left">
+            <h1>Dashboard Enfermagem</h1>
+            <div class="muted">
+                <span class="status-dot active"></span> Bem-vindo ao portal de gestão de escalas
+            </div>
+        </div>
+    </div>
+
+    <div class="kpis">
+        <div class="kpi">
+            <div class="muted">Escalas Ativas</div>
+            <div class="kpi-value">12</div>
+            <div class="muted">Deste mês</div>
+        </div>
+        <div class="kpi">
+            <div class="muted">Colaboradores</div>
+            <div class="kpi-value">156</div>
+            <div class="muted">Ativos: 150 | Férias: 6</div>
+        </div>
+        <div class="kpi">
+            <div class="muted">Setores</div>
+            <div class="kpi-value">8</div>
+            <div class="muted">Com escala ativa</div>
+        </div>
+        <div class="kpi">
+            <div class="muted">Cobertura</div>
+            <div class="kpi-value">98%</div>
+            <div class="muted">Dias cobertos</div>
+        </div>
+    </div>
+
+    <div class="dash-grid">
+        <div class="dash-left">
+            <div class="panel">
+                <div class="panel-head">
+                    <h2>Menu Principal</h2>
+                </div>
+                <div class="quick-actions">
+                    <a href="{{ url_for('nursing_ui.year_view') }}" class="qa">
+                        <div class="qa-emoji">📅</div>
+                        <div>
+                            <div class="qa-title">Escalas Mensais</div>
+                            <div class="qa-desc">Gerencie escalas por mês e setor</div>
+                        </div>
+                    </a>
+                    <a href="{{ url_for('nursing_ui.daily') }}" class="qa">
+                        <div class="qa-emoji">📋</div>
+                        <div>
+                            <div class="qa-title">Escala Diária</div>
+                            <div class="qa-desc">Acompanhe o plantão do dia</div>
+                        </div>
+                    </a>
+                    <a href="{{ url_for('nursing_ui.team') }}" class="qa">
+                        <div class="qa-emoji">👥</div>
+                        <div>
+                            <div class="qa-title">Equipe</div>
+                            <div class="qa-desc">Gerencie colaboradores</div>
+                        </div>
+                    </a>
+                    <a href="{{ url_for('nursing_ui.reports') }}" class="qa">
+                        <div class="qa-emoji">📊</div>
+                        <div>
+                            <div class="qa-title">Relatórios</div>
+                            <div class="qa-desc">Estatísticas e análises</div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

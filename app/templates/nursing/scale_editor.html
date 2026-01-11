@@ -1,0 +1,104 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+
+<div class="dash">
+
+  <div class="page-head">
+    <div class="page-head-left">
+      <a href="{{ url_for('nursing_ui.month_details', ano=ano, mes=mes) }}" class="back-link">← Voltar para o mês</a>
+      <h1>📅 Escala Mensal</h1>
+      <div class="muted">
+        Unidade: {{ unidade_nome or "—" }}
+        {% if active_sector %} • Setor: {{ active_sector.name }}{% endif %}
+        • {{ month_name(mes) }} {{ ano }}
+        • Status: {{ status }}
+      </div>
+    </div>
+
+    <div class="head-actions">
+      <button class="btn" type="button" disabled title="Em breve">⬇ Exportar PDF</button>
+      <button class="btn primary" type="button" disabled title="Em breve">＋ Novo Plantão</button>
+    </div>
+  </div>
+
+  <div class="controls-card">
+    <div class="month-nav">
+      <a class="icon-btn"
+         href="{{ url_for('nursing_ui.editor_view', ano=prev_ano, mes=prev_mes, sector_id=active_sector_id) }}"
+         title="Mês anterior">‹</a>
+
+      <div class="month-title">{{ month_name(mes) }} {{ ano }}</div>
+
+      <a class="icon-btn"
+         href="{{ url_for('nursing_ui.editor_view', ano=next_ano, mes=next_mes, sector_id=active_sector_id) }}"
+         title="Próximo mês">›</a>
+    </div>
+
+    <form class="searchbar" method="get"
+          action="{{ url_for('nursing_ui.editor_view', ano=ano, mes=mes, sector_id=active_sector_id) }}">
+      <input class="input" name="q" value="{{ q or '' }}" placeholder="Buscar profissional (nome, função, matrícula)..." />
+      <button class="icon-btn" type="submit" title="Buscar">🔎</button>
+    </form>
+  </div>
+
+  <div class="grid-card">
+    <div class="grid-scroll scroll-hide">
+      <table class="month-grid">
+        <thead>
+          <tr>
+            <th class="sticky-col">Profissional</th>
+            {% for d in days %}
+              <th class="day-head {% if d.is_weekend %}weekend{% endif %}">{{ "%02d"|format(d.day) }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+
+        <tbody>
+          {% if not professionals %}
+            <tr>
+              <td class="empty" colspan="{{ (days|length) + 1 }}">Nenhum profissional encontrado.</td>
+            </tr>
+          {% else %}
+            {% for p in professionals %}
+              <tr>
+                <td class="sticky-col">
+                  <div class="pname">{{ p.name }}</div>
+                  <div class="prole">
+                    {{ p.role or "—" }}
+                    {% if p.matricula %} • {{ p.matricula }}{% endif %}
+                    {% if p.turno %} • {{ p.turno }}{% endif %}
+                  </div>
+                </td>
+
+                {% for d in days %}
+                  {% set code = (cell_map.get(p.id, {}).get(d.day, '')) %}
+                  <td class="cell {% if d.is_weekend %}weekend{% endif %}">
+                    {% if code %}
+                      <button class="chip chip-{{ code|lower }}" type="button" disabled title="Em breve">
+                        {{ code }}
+                      </button>
+                    {% else %}
+                      <span class="chip chip-empty">—</span>
+                    {% endif %}
+                  </td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="legend">
+      <span class="lg"><span class="dot dot-m"></span> M</span>
+      <span class="lg"><span class="dot dot-t"></span> T</span>
+      <span class="lg"><span class="dot dot-n"></span> N</span>
+      <span class="lg"><span class="dot dot-d"></span> D</span>
+      <span class="lg"><span class="dot dot-f"></span> F</span>
+      <span class="lg"><span class="dot dot-fe"></span> FE</span>
+      <span class="lg"><span class="dot dot-at"></span> AT</span>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
