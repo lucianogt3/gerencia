@@ -3,102 +3,453 @@
 
 <div class="dash">
 
+  <!-- Cabeçalho -->
   <div class="page-head">
     <div class="page-head-left">
-      <a href="{{ url_for('nursing_ui.month_details', ano=ano, mes=mes) }}" class="back-link">← Voltar para o mês</a>
-      <h1>📅 Escala Mensal</h1>
+      <a class="muted" href="{{ url_for('nursing_ui.month_details', ano=ano, mes=mes) }}">← Voltar para o mês</a>
+      <h1>🗓️ Escala Mensal</h1>
       <div class="muted">
-        Unidade: {{ unidade_nome or "—" }}
-        {% if active_sector %} • Setor: {{ active_sector.name }}{% endif %}
-        • {{ month_name(mes) }} {{ ano }}
-        • Status: {{ status }}
+        Setor: {{ active_sector.name if active_sector else "—" }}
+        • {{ "%02d"|format(mes) }}/{{ ano }}
+        • Status: {{ status or "draft" }}
       </div>
     </div>
 
     <div class="head-actions">
-      <button class="btn" type="button" disabled title="Em breve">⬇ Exportar PDF</button>
-      <button class="btn primary" type="button" disabled title="Em breve">＋ Novo Plantão</button>
+      <button class="btn" type="button" id="btnImportSector">👥 Importar ativos do setor</button>
+      <button class="btn primary" type="button" id="btnAddProfessional">➕ Adicionar profissional</button>
+      <button class="btn" type="button" disabled title="PDF depois">⬇️ Exportar PDF</button>
     </div>
   </div>
 
-  <div class="controls-card">
-    <div class="month-nav">
-      <a class="icon-btn"
-         href="{{ url_for('nursing_ui.editor_view', ano=prev_ano, mes=prev_mes, sector_id=active_sector_id) }}"
-         title="Mês anterior">‹</a>
+  <!-- Editor de Escala -->
+  <div class="card" style="margin-top:12px;">
+    <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <div>
+        <div style="font-weight:700;">Escala • {{ "%02d"|format(mes) }}/{{ ano }}</div>
+        <div class="muted" style="margin-top:2px;">Clique em um profissional para editar / mover / remover</div>
+      </div>
 
-      <div class="month-title">{{ month_name(mes) }} {{ ano }}</div>
-
-      <a class="icon-btn"
-         href="{{ url_for('nursing_ui.editor_view', ano=next_ano, mes=next_mes, sector_id=active_sector_id) }}"
-         title="Próximo mês">›</a>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn" type="button" id="btnImportSector2">👥 Importar</button>
+        <button class="btn primary" type="button" id="btnAddProfessional2">➕ Adicionar</button>
+      </div>
     </div>
 
-    <form class="searchbar" method="get"
-          action="{{ url_for('nursing_ui.editor_view', ano=ano, mes=mes, sector_id=active_sector_id) }}">
-      <input class="input" name="q" value="{{ q or '' }}" placeholder="Buscar profissional (nome, função, matrícula)..." />
-      <button class="icon-btn" type="submit" title="Buscar">🔎</button>
-    </form>
-  </div>
-
-  <div class="grid-card">
-    <div class="grid-scroll scroll-hide">
-      <table class="month-grid">
+    <!-- Grade -->
+    <div class="table-wrap" style="margin-top:12px;overflow:auto;border-radius:12px;border:1px solid rgba(255,255,255,.08);">
+      <table class="table" style="min-width:980px;">
         <thead>
           <tr>
-            <th class="sticky-col">Profissional</th>
-            {% for d in days %}
-              <th class="day-head {% if d.is_weekend %}weekend{% endif %}">{{ "%02d"|format(d.day) }}</th>
+            <th style="position:sticky;left:0;z-index:2;background:var(--card);min-width:260px;">
+              Profissional / Regra
+            </th>
+
+            {# ✅ dias do mês calculados a partir de days #}
+            {% for d in range(1, (days|length) + 1) %}
+              <th style="text-align:center;min-width:34px;">{{ "%02d"|format(d) }}</th>
             {% endfor %}
           </tr>
         </thead>
 
         <tbody>
-          {% if not professionals %}
-            <tr>
-              <td class="empty" colspan="{{ (days|length) + 1 }}">Nenhum profissional encontrado.</td>
-            </tr>
-          {% else %}
-            {% for p in professionals %}
-              <tr>
-                <td class="sticky-col">
-                  <div class="pname">{{ p.name }}</div>
-                  <div class="prole">
-                    {{ p.role or "—" }}
-                    {% if p.matricula %} • {{ p.matricula }}{% endif %}
-                    {% if p.turno %} • {{ p.turno }}{% endif %}
-                  </div>
-                </td>
+          {% if rows and rows|length %}
+            {% for group in rows %}
 
-                {% for d in days %}
-                  {% set code = (cell_map.get(p.id, {}).get(d.day, '')) %}
-                  <td class="cell {% if d.is_weekend %}weekend{% endif %}">
-                    {% if code %}
-                      <button class="chip chip-{{ code|lower }}" type="button" disabled title="Em breve">
-                        {{ code }}
-                      </button>
-                    {% else %}
-                      <span class="chip chip-empty">—</span>
-                    {% endif %}
-                  </td>
-                {% endfor %}
+              {# Cabeçalho do grupo (Cargo/Role) #}
+              <tr>
+                <td colspan="{{ 1 + (days|length) }}"
+                    style="padding:10px 12px;font-weight:800;background:rgba(255,255,255,.04);">
+                  {{ group["title"] if group is mapping and group.get("title") else (group.title if group.title is defined else "—") }}
+                </td>
               </tr>
+
+              {% set items = (group.get("items") if group is mapping else (group.items if group.items is defined else [])) %}
+              {% for r in items %}
+                <tr class="row-prof">
+                  <!-- coluna fixa -->
+                  <td style="position:sticky;left:0;z-index:1;background:var(--card);">
+                    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                      <div>
+                        <div style="font-weight:700;">{{ r.name if r.name is defined else r.get("name","—") }}</div>
+                        <div class="muted" style="font-size:.85rem;">
+                          {{ r.rule_label if r.rule_label is defined else r.get("rule_label","—") }}
+                          •
+                          {{ r.matricula if r.matricula is defined else r.get("matricula","—") }}
+                        </div>
+                      </div>
+
+                      <button class="btn small" type="button"
+                        data-open-transfer="1"
+                        data-user-id="{{ r.user_id if r.user_id is defined else r.get('user_id',0) }}"
+                        data-user-name="{{ r.name if r.name is defined else r.get('name','') }}"
+                        data-user-sector-id="{{ r.sector_id if r.sector_id is defined else r.get('sector_id',0) }}"
+                        data-user-sector-name="{{ r.sector_name if r.sector_name is defined else r.get('sector_name','') }}">
+                        ⚙️
+                      </button>
+                    </div>
+                  </td>
+
+                  {% set cells = (r.cells if r.cells is defined else r.get("cells", {})) %}
+                  {% for d in range(1, (days|length) + 1) %}
+                    {% set cell = (cells.get(d) if cells is mapping else None) %}
+                    <td style="text-align:center;">
+                      {% if cell %}
+                        <span class="pill">{{ cell }}</span>
+                      {% else %}
+                        <span class="muted">—</span>
+                      {% endif %}
+                    </td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
             {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="{{ 1 + (days|length) }}" class="muted" style="padding:14px;">
+                Nenhum profissional ainda. Use “Importar” ou “Adicionar”.
+              </td>
+            </tr>
           {% endif %}
         </tbody>
       </table>
     </div>
-
-    <div class="legend">
-      <span class="lg"><span class="dot dot-m"></span> M</span>
-      <span class="lg"><span class="dot dot-t"></span> T</span>
-      <span class="lg"><span class="dot dot-n"></span> N</span>
-      <span class="lg"><span class="dot dot-d"></span> D</span>
-      <span class="lg"><span class="dot dot-f"></span> F</span>
-      <span class="lg"><span class="dot dot-fe"></span> FE</span>
-      <span class="lg"><span class="dot dot-at"></span> AT</span>
-    </div>
   </div>
 
 </div>
+
+
+<!-- =========================
+  MODAL: Importar Setor
+========================= -->
+<div class="modal" id="modalImport" aria-hidden="true">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>Importar ativos do setor</h3>
+      <button class="icon-btn" type="button" data-close="#modalImport">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <p class="muted">
+        Isso vai adicionar TODOS os colaboradores ativos do setor
+        <strong>{{ active_sector.name if active_sector else "—" }}</strong>.
+      </p>
+
+      <label class="check" style="display:flex;gap:10px;align-items:center;margin-top:10px;">
+        <input type="checkbox" id="importAutoFill" checked>
+        <span>Auto preencher mês (par/ímpar, diurno/noturno)</span>
+      </label>
+
+      <div class="alert warn" style="margin-top:12px;">
+        Se o colaborador estiver em outro setor no mesmo mês, use o modal "Adicionar profissional"
+        para transferir com confirmação.
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn" type="button" data-close="#modalImport">Cancelar</button>
+      <button class="btn primary" type="button" id="confirmImport">Importar agora</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- =========================
+  MODAL: Adicionar Profissional
+========================= -->
+<div class="modal" id="modalAdd" aria-hidden="true">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>Adicionar profissional</h3>
+      <button class="icon-btn" type="button" data-close="#modalAdd">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="row" style="display:flex;gap:10px;align-items:end;">
+        <div style="flex:1;">
+          <label>Buscar (nome ou matrícula)</label>
+          <input class="input" id="searchUser" placeholder="Ex: Luciano ou 12345" type="search">
+        </div>
+        <button class="btn" type="button" id="btnSearchUser">Buscar</button>
+      </div>
+
+      <div id="searchResults" style="margin-top:12px;">
+        <div class="muted">Digite e clique em Buscar.</div>
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn" type="button" data-close="#modalAdd">Fechar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- =========================
+  MODAL: Confirmar Transferência
+========================= -->
+<div class="modal" id="modalConfirmTransfer" aria-hidden="true">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>Confirmar transferência</h3>
+      <button class="icon-btn" type="button" data-close="#modalConfirmTransfer">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <p>
+        O profissional <strong id="ctName">—</strong> está em outro setor:
+        <strong id="ctFromSector">—</strong>.
+      </p>
+
+      <p class="muted" style="margin-top:6px;">
+        Ao confirmar, ele será removido da escala do setor anterior neste mês e adicionado aqui.
+      </p>
+
+      <label style="margin-top:10px;display:block;">Motivo (opcional)</label>
+      <input class="input" id="ctNotes" placeholder="Ex: Cobertura, remanejamento, apoio...">
+
+      <input type="hidden" id="ctUserId">
+      <input type="hidden" id="ctUserSectorId">
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn" type="button" data-close="#modalConfirmTransfer">Cancelar</button>
+      <button class="btn danger" type="button" id="confirmTransfer">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+(function () {
+  const scheduleId = Number("{{ schedule_id|default(0) }}");
+  const sectorId   = Number("{{ active_sector_id|default(0) }}");
+  const year       = Number("{{ ano|default(0) }}");
+  const month      = Number("{{ mes|default(0) }}");
+
+  function openModal(sel) {
+    const el = document.querySelector(sel);
+    if (!el) return;
+    el.setAttribute("aria-hidden", "false");
+    el.classList.add("open");
+  }
+
+  function closeModal(sel) {
+    const el = document.querySelector(sel);
+    if (!el) return;
+    el.setAttribute("aria-hidden", "true");
+    el.classList.remove("open");
+  }
+
+  document.addEventListener("click", (e) => {
+    const closeBtn = e.target.closest("[data-close]");
+    if (closeBtn) closeModal(closeBtn.getAttribute("data-close"));
+  });
+
+  const btnImportSector1 = document.getElementById("btnImportSector");
+  const btnImportSector2 = document.getElementById("btnImportSector2");
+  const btnAddProfessional1 = document.getElementById("btnAddProfessional");
+  const btnAddProfessional2 = document.getElementById("btnAddProfessional2");
+
+  if (btnImportSector1) btnImportSector1.addEventListener("click", () => openModal("#modalImport"));
+  if (btnImportSector2) btnImportSector2.addEventListener("click", () => openModal("#modalImport"));
+  if (btnAddProfessional1) btnAddProfessional1.addEventListener("click", () => openModal("#modalAdd"));
+  if (btnAddProfessional2) btnAddProfessional2.addEventListener("click", () => openModal("#modalAdd"));
+
+  const confirmImport = document.getElementById("confirmImport");
+  if (confirmImport) {
+    confirmImport.addEventListener("click", async () => {
+      const autoFill = document.getElementById("importAutoFill")?.checked ?? true;
+
+      try {
+        const res = await fetch(`/api/nursing/monthly/${scheduleId}/import_sector`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ auto_fill: autoFill })
+        });
+
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          alert(j.error || "Falha ao importar setor");
+          return;
+        }
+
+        closeModal("#modalImport");
+        location.reload();
+      } catch (err) {
+        alert("Erro de rede ao importar setor.");
+      }
+    });
+  }
+
+  const btnSearchUser = document.getElementById("btnSearchUser");
+  const searchUser = document.getElementById("searchUser");
+  const searchResults = document.getElementById("searchResults");
+
+  async function doSearch() {
+    const q = (searchUser?.value || "").trim();
+    if (!searchResults) return;
+
+    if (!q) {
+      searchResults.innerHTML = '<div class="muted">Digite algo para buscar.</div>';
+      return;
+    }
+
+    searchResults.innerHTML = '<div class="muted">Buscando...</div>';
+
+    try {
+      const res = await fetch(`/api/nursing/users/search?q=${encodeURIComponent(q)}`);
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        searchResults.innerHTML = `<div class="alert danger">${data.error || "Erro na busca"}</div>`;
+        return;
+      }
+
+      const items = Array.isArray(data.items) ? data.items : [];
+      if (!items.length) {
+        searchResults.innerHTML = '<div class="muted">Nenhum resultado.</div>';
+        return;
+      }
+
+      searchResults.innerHTML = `
+        <div class="list">
+          ${items.map(u => `
+            <div class="list-item" style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+              <div>
+                <div><strong>${escapeHtml(u.name || "")}</strong>
+                  <span class="muted">(${escapeHtml(u.matricula || "—")})</span>
+                </div>
+                <div class="muted">
+                  Setor: ${escapeHtml(u.sector_name || "—")}
+                  • Turno: ${escapeHtml(u.turno || "—")}
+                  • Cargo: ${escapeHtml(u.role_label || "—")}
+                </div>
+              </div>
+
+              <button class="btn small pick-user"
+                type="button"
+                data-user-id="${Number(u.id || 0)}"
+                data-user-name="${escapeAttr(u.name || "")}"
+                data-user-sector-id="${Number(u.sector_id || 0)}"
+                data-user-sector-name="${escapeAttr(u.sector_name || "")}">
+                Adicionar
+              </button>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    } catch (err) {
+      searchResults.innerHTML = '<div class="alert danger">Erro de rede ao buscar.</div>';
+    }
+  }
+
+  if (btnSearchUser) btnSearchUser.addEventListener("click", doSearch);
+  if (searchUser) {
+    searchUser.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        doSearch();
+      }
+    });
+  }
+
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".pick-user");
+    if (!btn) return;
+
+    const userId = Number(btn.dataset.userId || 0);
+    const userName = btn.dataset.userName || "";
+    const userSectorId = Number(btn.dataset.userSectorId || 0);
+    const userSectorName = btn.dataset.userSectorName || "";
+
+    if (!userId) return;
+
+    if (userSectorId && userSectorId !== sectorId) {
+      document.getElementById("ctName").textContent = userName || "—";
+      document.getElementById("ctFromSector").textContent = userSectorName || `Setor ${userSectorId}`;
+      document.getElementById("ctUserId").value = String(userId);
+      document.getElementById("ctUserSectorId").value = String(userSectorId);
+      document.getElementById("ctNotes").value = "";
+      openModal("#modalConfirmTransfer");
+      return;
+    }
+
+    await addUserToSchedule(userId);
+  });
+
+  async function addUserToSchedule(userId) {
+    try {
+      const res = await fetch(`/api/nursing/monthly/${scheduleId}/add_user_auto`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId })
+      });
+
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(j.error || "Falha ao adicionar");
+        return;
+      }
+
+      closeModal("#modalAdd");
+      location.reload();
+    } catch (err) {
+      alert("Erro de rede ao adicionar.");
+    }
+  }
+
+  const confirmTransfer = document.getElementById("confirmTransfer");
+  if (confirmTransfer) {
+    confirmTransfer.addEventListener("click", async () => {
+      const userId = Number(document.getElementById("ctUserId").value || 0);
+      const notes = (document.getElementById("ctNotes").value || "").trim();
+
+      try {
+        const res = await fetch(`/api/nursing/transfer`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: userId,
+            to_sector_id: sectorId,
+            year: year,
+            month: month,
+            schedule_id: scheduleId,
+            notes: notes
+          })
+        });
+
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          alert(j.error || "Falha ao transferir");
+          return;
+        }
+
+        closeModal("#modalConfirmTransfer");
+        closeModal("#modalAdd");
+        location.reload();
+      } catch (err) {
+        alert("Erro de rede ao transferir.");
+      }
+    });
+  }
+
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest('[data-open-transfer="1"]');
+    if (!btn) return;
+    console.log('Editar profissional:', btn.dataset);
+  });
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function escapeAttr(str) {
+    return escapeHtml(str).replace(/`/g, '&#096;');
+  }
+})();
+</script>
+
 {% endblock %}

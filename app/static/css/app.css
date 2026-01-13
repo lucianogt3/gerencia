@@ -1295,6 +1295,93 @@ select.input option {
   gap: 10px;
   justify-content: flex-end;
 }
+/* =========================
+   MODAIS (Importar / Adicionar / Transferir)
+   ========================= */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: none;              /* ✅ ESCONDE por padrão */
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(6px);
+}
+
+.modal.open {
+  display: flex;              /* ✅ aparece quando o JS adiciona .open */
+}
+
+.modal[aria-hidden="true"] {
+  display: none;              /* ✅ reforço */
+}
+
+.modal-card {
+  width: min(720px, 100%);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 18px 60px rgba(0,0,0,.55);
+  overflow: hidden;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.modal-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.modal-body {
+  padding: 16px;
+}
+
+.modal-foot {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 14px 16px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.icon-btn:hover { filter: brightness(1.06); }
+
+/* Alerts usados no modal */
+.alert {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04);
+}
+
+.alert.warn {
+  border-color: rgba(255,170,0,.35);
+  background: rgba(255,170,0,.10);
+}
+.alert.danger {
+  border-color: rgba(255,71,87,.35);
+  background: rgba(255,71,87,.10);
+}
 
 
 /* =========================================================
@@ -1450,3 +1537,4 @@ select.input option {
 .chip-at { background: rgba(239,68,68,.18); border-color: rgba(239,68,68,.22); }
 
 .empty { padding: 18px; text-align: ce
+

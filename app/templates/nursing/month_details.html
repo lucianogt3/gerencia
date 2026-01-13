@@ -43,6 +43,8 @@
 
 <div id="createModal" class="modal-overlay" style="display:none;">
   <form class="modal-box" action="{{ url_for('nursing_ui.create_scale_action') }}" method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
     <h3>Nova escala • {{ month_label }}</h3>
 
     <input type="hidden" name="ano" value="{{ ano }}">
@@ -65,6 +67,7 @@
     </div>
   </form>
 </div>
+
 
 <script>
   function openCreateModal(){ document.getElementById('createModal').style.display='flex'; }

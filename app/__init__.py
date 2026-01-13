@@ -1,6 +1,8 @@
 ﻿from __future__ import annotations
 
 import os
+from pathlib import Path
+
 from flask import Flask
 from dotenv import load_dotenv
 
@@ -16,6 +18,7 @@ ROLE_LABELS = {
     "admin": "Admin",
 }
 
+
 def create_app() -> Flask:
     load_dotenv()
 
@@ -24,6 +27,16 @@ def create_app() -> Flask:
 
     # 1) Garante instance/ existe (muito importante no Windows p/ sqlite e uploads)
     os.makedirs(app.instance_path, exist_ok=True)
+
+    # ✅ 1.1) Força SQLite com caminho ABSOLUTO no instance/ (Windows-safe)
+    db_path = Path(app.instance_path) / "app.db"
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + db_path.as_posix()
+    app.config.setdefault("SQLALCHEMY_TRACK_MODIFICATIONS", False)
+
+    # (debug opcional)
+    print(">>> DB URI:", app.config.get("SQLALCHEMY_DATABASE_URI"))
+    print(">>> INSTANCE:", app.instance_path)
+    print(">>> CWD:", os.getcwd())
 
     # 2) Garante pasta de upload (com fallback seguro)
     upload_folder = app.config.get("UPLOAD_FOLDER") or os.path.join(app.instance_path, "uploads")
@@ -63,9 +76,8 @@ def create_app() -> Flask:
     from .blueprints.sick_notes.routes import sick_notes_bp
     from .blueprints.nursing_ui import bp as nursing_ui_bp
     from .blueprints.announcements.routes import bp as announcements_bp
-
-    # NOVO: API da escala mensal/diária (se existir no seu projeto)
-    from .blueprints.nursing import bp as nursing_api_bp
+    from .utils.jinja_helpers import month_name
+    from .blueprints.nursing import bp as nursing_api_bp  # API escala mensal/diária
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
@@ -79,10 +91,22 @@ def create_app() -> Flask:
     app.register_blueprint(settings_bp)
     app.register_blueprint(announcements_bp)
 
+    app.jinja_env.globals["month_name"] = month_name
+
+    # ✅ Importa models para registrar no metadata
     with app.app_context():
-        # garante que todos os models sejam importados/registrados no metadata
         from . import models  # noqa: F401
-        db.create_all()
+        # ❌ NÃO rode db.create_all() no boot (quebra no --debug no Windows)
+
+    # ✅ CLI: init-db (criar tabelas manualmente 1 vez)
+    @app.cli.command("init-db")
+    def init_db_command():
+        """Cria as tabelas do banco (SQLite) no instance/app.db."""
+        from . import models  # noqa: F401
+
+        with app.app_context():
+            db.create_all()
+        print("✅ Banco criado/atualizado com sucesso:", db_path)
 
     # ✅ CLI commands (SEED)
     from .seed import seed_command

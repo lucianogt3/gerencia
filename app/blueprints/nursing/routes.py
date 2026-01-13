@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import calendar
-from datetime import date
 from typing import Any, Dict, List
+from datetime import date
 
 from flask import (
     Blueprint, render_template, request, redirect, url_for, flash, abort
@@ -39,9 +39,10 @@ def month_name(m: int) -> str:
 
 @bp.app_context_processor
 def inject_globals():
-    # deixa disponível no Jinja: {{ month_name(mes) }}
-    return {"month_name": month_name}
-
+    return {
+        "month_name": month_name,
+        "current_year": date.today().year
+    }
 
 def _require_manager():
     if getattr(current_user, "role", "") not in ("manager", "admin"):
@@ -176,6 +177,7 @@ def create_scale_action():
 # =========================
 # NÍVEL 3: Editor (tabela mensal)
 # =========================
+
 @bp.get("/scales/<int:ano>/<int:mes>/<int:sector_id>")
 @login_required
 def editor_view(ano: int, mes: int, sector_id: int):
@@ -187,10 +189,12 @@ def editor_view(ano: int, mes: int, sector_id: int):
         return redirect(url_for("nursing_ui.month_details", ano=ano, mes=mes))
 
     sector = Sector.query.get(sector_id)
+
     days = _build_days(ano, mes)
+    days_in_month = calendar.monthrange(ano, mes)[1]   # ✅ ADICIONA ISSO
+
     prev_ano, prev_mes, next_ano, next_mes = _month_nav(ano, mes)
 
-    # linhas (membros)
     members = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, active=True).all()
 
     q = (request.args.get("q") or "").strip().lower()
@@ -215,7 +219,6 @@ def editor_view(ano: int, mes: int, sector_id: int):
             "turno": getattr(u, "turno", None),
         })
 
-    # células -> map simples user_id/dia -> código
     cell_map: Dict[int, Dict[int, str]] = {}
     cells = NursingMonthlyCell.query.filter_by(schedule_id=sched.id).all()
     for c in cells:
@@ -237,12 +240,15 @@ def editor_view(ano: int, mes: int, sector_id: int):
         active_sector=sector,
         sectors=Sector.query.filter_by(active=True).order_by(Sector.name.asc()).all(),
         days=days,
+        days_in_month=days_in_month,        # ✅ ADICIONA ISSO
         professionals=professionals,
         cell_map=cell_map,
         q=q,
         schedule_id=sched.id,
         status=sched.status,
     )
+
+
 @bp.route("/daily")
 @login_required
 def daily():
@@ -259,10 +265,3 @@ def daily_page():
     """Alias para a página diária"""
     return redirect(url_for('nursing_ui.daily'))
 
-@bp.app_context_processor
-def inject_globals():
-    from datetime import date
-    return {
-        "month_name": month_name,
-        "current_year": date.today().year
-    }

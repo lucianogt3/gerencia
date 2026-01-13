@@ -1,27 +1,17 @@
 ﻿from __future__ import annotations
 
 import calendar
-from datetime import date
 from typing import Any, Dict, List
+from datetime import date
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 from flask_login import login_required, current_user
 
 from app.extensions import db
-from app.models import (
-    Sector,
-    User,
-    NursingMonthlySchedule,
-    NursingMonthlyMember,
-    NursingMonthlyCell,
-)
+from app.models import Sector, User, NursingMonthlySchedule, NursingMonthlyMember, NursingMonthlyCell
 
 bp = Blueprint("nursing_ui", __name__, url_prefix="/nursing")
 
-
-# =========================
-# Helpers / Permissão
-# =========================
 MONTHS_PT = [
     "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
@@ -34,62 +24,40 @@ def month_name(m: int) -> str:
         return ""
     return MONTHS_PT[m - 1] if 1 <= m <= 12 else ""
 
-
 @bp.app_context_processor
 def inject_globals():
-    return {"month_name": month_name}
-
+    return {"month_name": month_name, "current_year": date.today().year}
 
 def _require_manager():
     if getattr(current_user, "role", "") not in ("manager", "admin"):
         abort(403)
-
 
 def _month_nav(ano: int, mes: int):
     prev_ano, prev_mes = (ano - 1, 12) if mes == 1 else (ano, mes - 1)
     next_ano, next_mes = (ano + 1, 1) if mes == 12 else (ano, mes + 1)
     return prev_ano, prev_mes, next_ano, next_mes
 
-
 def _build_days(ano: int, mes: int) -> List[Dict[str, Any]]:
     last_day = calendar.monthrange(ano, mes)[1]
     out: List[Dict[str, Any]] = []
     for d in range(1, last_day + 1):
-        wd = date(ano, mes, d).weekday()  # 0 seg ... 6 dom
+        wd = date(ano, mes, d).weekday()
         out.append({"day": d, "is_weekend": wd >= 5})
     return out
 
-
-# =========================
-# NÍVEL 1: Ano (cards de meses)
-# =========================
 @bp.get("/scales")
 @login_required
 def year_view():
     _require_manager()
-
     ano = int(request.args.get("ano") or date.today().year)
 
     months_list = []
     for m in range(1, 13):
         count = NursingMonthlySchedule.query.filter_by(year=ano, month=m).count()
-        months_list.append({
-            "num": m,
-            "name": month_name(m),
-            "active_scales_count": count
-        })
+        months_list.append({"num": m, "name": month_name(m), "active_scales_count": count})
 
-    return render_template(
-        "nursing/years_view.html",
-        title=f"Escalas {ano}",
-        ano=ano,
-        months_list=months_list,
-    )
+    return render_template("nursing/years_view.html", title=f"Escalas {ano}", ano=ano, months_list=months_list)
 
-
-# =========================
-# NÍVEL 2: Mês (cards de setores com escala)
-# =========================
 @bp.get("/scales/<int:ano>/<int:mes>")
 @login_required
 def month_details(ano: int, mes: int):
@@ -124,17 +92,12 @@ def month_details(ano: int, mes: int):
     return render_template(
         "nursing/month_details.html",
         title=f"{month_name(mes)} {ano}",
-        ano=ano,
-        mes=mes,
-        month_name=month_name(mes),
+        ano=ano, mes=mes,
+        month_label=month_name(mes),
         existing_scales=existing_scales,
         available_sectors=available_sectors,
     )
 
-
-# =========================
-# Ação: criar a escala (cria o card)
-# =========================
 @bp.post("/scales/create")
 @login_required
 def create_scale_action():
@@ -154,9 +117,7 @@ def create_scale_action():
         return redirect(url_for("nursing_ui.month_details", ano=ano, mes=mes))
 
     sched = NursingMonthlySchedule(
-        sector_id=sector_id,
-        year=ano,
-        month=mes,
+        sector_id=sector_id, year=ano, month=mes,
         status="draft",
         created_by_id=getattr(current_user, "id", None),
     )
@@ -166,10 +127,6 @@ def create_scale_action():
     flash("Escala criada! Clique no card para editar.", "success")
     return redirect(url_for("nursing_ui.month_details", ano=ano, mes=mes))
 
-
-# =========================
-# NÍVEL 3: Editor (tabela mensal)
-# =========================
 @bp.get("/scales/<int:ano>/<int:mes>/<int:sector_id>")
 @login_required
 def editor_view(ano: int, mes: int, sector_id: int):
@@ -181,7 +138,10 @@ def editor_view(ano: int, mes: int, sector_id: int):
         return redirect(url_for("nursing_ui.month_details", ano=ano, mes=mes))
 
     sector = Sector.query.get(sector_id)
+
+    days_in_month = calendar.monthrange(ano, mes)[1]      # ✅ garante 28/29/30/31 certo
     days = _build_days(ano, mes)
+
     prev_ano, prev_mes, next_ano, next_mes = _month_nav(ano, mes)
 
     members = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, active=True).all()
@@ -217,14 +177,10 @@ def editor_view(ano: int, mes: int, sector_id: int):
 
     return render_template(
         "nursing/scale_editor.html",
-        title=f"Escala  {month_name(mes)} {ano}",
-        unidade_nome=getattr(current_user, "unidade_nome", None),
-        ano=ano,
-        mes=mes,
-        prev_ano=prev_ano,
-        prev_mes=prev_mes,
-        next_ano=next_ano,
-        next_mes=next_mes,
+        title=f"Escala • {month_name(mes)} {ano}",
+        ano=ano, mes=mes,
+        days_in_month=days_in_month,   # ✅ o template pode usar isso
+        prev_ano=prev_ano, prev_mes=prev_mes, next_ano=next_ano, next_mes=next_mes,
         active_sector_id=sector_id,
         active_sector=sector,
         sectors=Sector.query.filter_by(active=True).order_by(Sector.name.asc()).all(),
@@ -236,20 +192,13 @@ def editor_view(ano: int, mes: int, sector_id: int):
         status=sched.status,
     )
 
-
-# =========================
-# (Compat) rota diária para não quebrar o menu
-# =========================
 @bp.get("/daily")
 @login_required
-def daily_page():
-    _require_manager()
-    today = date.today().isoformat()
-    return render_template("nursing/daily.html", title="Escala Diária", today=today)
+def daily():
+    today = date.today()
+    return render_template("nursing/daily.html", current_date=today)
 
-@bp.get("/monthly")
+@bp.get("/daily-page")
 @login_required
-def monthly_page():
-    # compatibilidade com links antigos
-    return redirect(url_for("nursing_ui.year_view"))
-
+def daily_page():
+    return redirect(url_for("nursing_ui.daily"))
