@@ -1,9 +1,198 @@
 ﻿{% extends "layouts/base.html" %}
 {% block content %}
-  <h1>Trocas</h1>
-  <p class="muted">Estrutura pronta. PrÃ³xima etapa: fluxo completo (substituto â†’ gerÃªncia â†’ termo imprimÃ­vel).</p>
+
+<div class="dash">
+  <div class="page-head">
+    <div class="page-head-left">
+      <h1>🔁 Central de Trocas</h1>
+      <div class="muted">Solicitações e aprovações de plantão</div>
+    </div>
+    <div class="head-actions">
+        <button class="btn primary" onclick="openModal('modalRequest')">➕ Nova Solicitação</button>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card info">
+        <div class="kpi-value">{{ kpi.pending }}</div>
+        <div class="kpi-label">Pendentes</div>
+    </div>
+    <div class="kpi-card success">
+        <div class="kpi-value">{{ kpi.approved }}</div>
+        <div class="kpi-label">Aprovadas</div>
+    </div>
+    <div class="kpi-card danger">
+        <div class="kpi-value">{{ kpi.refused }}</div>
+        <div class="kpi-label">Recusadas</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:20px;">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+            <tr>
+                <th>Solicitante</th>
+                <th>Substituto</th>
+                <th>Data Saída</th>
+                <th>Data Devolução</th>
+                <th>Status</th>
+                <th class="text-right">Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if swaps %}
+                {% for s in swaps %}
+                <tr>
+                    <td>
+                        <div style="font-weight:bold;">{{ s.requester.nome }}</div>
+                        <div class="muted">Mat: {{ s.requester.matricula }}</div>
+                    </td>
+                    <td>
+                        <div style="font-weight:bold;">{{ s.substitute.nome }}</div>
+                        <div class="muted">Mat: {{ s.substitute.matricula }}</div>
+                    </td>
+                    <td>
+                        <div style="color:#ef4444; font-weight:bold;">📉 {{ s.original_date.strftime('%d/%m') }}</div>
+                        <div class="muted">Turno: {{ s.original_shift }}</div>
+                    </td>
+                    <td>
+                        {% if s.target_date %}
+                            <div style="color:#10b981; font-weight:bold;">📈 {{ s.target_date.strftime('%d/%m') }}</div>
+                            <div class="muted">Turno: {{ s.target_shift }}</div>
+                        {% else %}
+                            <span class="muted">Não informado</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if s.status == 'pending' %}<span class="badge warning">Pendente</span>
+                        {% elif s.status == 'approved' %}<span class="badge success">Aprovado</span>
+                        {% else %}
+                            <span class="badge danger" title="Motivo: {{ s.refusal_reason }}">Recusado</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-right">
+                        {% if s.status == 'pending' and current_user.role in ['manager','admin'] %}
+                            <button class="btn small success" onclick="confirmSwap('approve', {{ s.id }})">✔ Aprovar</button>
+                            <button class="btn small danger" onclick="rejectSwap({{ s.id }})">✖ Recusar</button>
+                        {% endif %}
+                        
+                        {% if s.status == 'approved' %}
+                            <a href="{{ url_for('swaps.print_term', id=s.id) }}" target="_blank" class="btn small">🖨️ Imprimir Termo</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr><td colspan="6" class="text-center muted" style="padding:30px;">Nenhuma solicitação encontrada.</td></tr>
+            {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modalRequest" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; justify-content:center; align-items:center;">
+    <div class="modal-card" style="background:#1e1e1e; padding:25px; border-radius:12px; width:500px; border:1px solid #333;">
+        <h3 style="margin-bottom:15px;">Solicitar Troca</h3>
+        <form method="POST" action="{{ url_for('swaps.create') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            
+            <label style="display:block; margin-bottom:5px;">Motivo da Troca:</label>
+            <div style="display:flex; gap:15px; margin-bottom:15px;">
+                <label class="radio-label"><input type="radio" name="request_type" value="empregado" checked> Pedido do Empregado</label>
+                <label class="radio-label"><input type="radio" name="request_type" value="servico"> Necessidade do Serviço</label>
+            </div>
+
+            <label>Quem vai te substituir?</label>
+            <select name="substitute_id" class="input" style="width:100%; margin-bottom:15px;">
+                <option value="">Selecione...</option>
+                {% for u in users %}
+                    <option value="{{ u.id }}">{{ u.nome }}</option>
+                {% endfor %}
+            </select>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:15px;">
+                <div>
+                    <label style="color:#ef4444; font-weight:bold;">📉 Dia que vou sair:</label>
+                    <input type="date" name="original_date" class="input" style="width:100%;" required>
+                    <select name="original_shift" class="input" style="width:100%; margin-top:5px;">
+                        <option value="D">Dia</option><option value="N">Noite</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="color:#10b981; font-weight:bold;">📈 Dia que vou pagar:</label>
+                    <input type="date" name="target_date" class="input" style="width:100%;">
+                    <select name="target_shift" class="input" style="width:100%; margin-top:5px;">
+                        <option value="D">Dia</option><option value="N">Noite</option>
+                    </select>
+                </div>
+            </div>
+
+            <label>Justificativa:</label>
+            <input type="text" name="reason" class="input" style="width:100%; margin-bottom:20px;" placeholder="Ex: Consulta médica, viagem...">
+
+            <div class="text-right">
+                <button type="button" class="btn" onclick="closeModal('modalRequest')">Cancelar</button>
+                <button type="submit" class="btn primary">Solicitar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal" id="modalReject" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; justify-content:center; align-items:center;">
+    <div class="modal-card" style="background:#1e1e1e; padding:20px; border-radius:12px; width:400px; border:1px solid #333;">
+        <h3>Motivo da Recusa</h3>
+        <form method="POST" id="formReject">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="refuse">
+            <textarea name="refusal_reason" class="input" style="width:100%; height:100px; margin-bottom:15px;" placeholder="Explique o motivo..." required></textarea>
+            <div class="text-right">
+                <button type="button" class="btn" onclick="closeModal('modalReject')">Cancelar</button>
+                <button type="submit" class="btn danger">Confirmar Recusa</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<form id="formApprove" method="POST" style="display:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="approve">
+</form>
+
+<script>
+function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+function confirmSwap(action, id) {
+    if(confirm("Confirma aprovação? Isso atualizará a escala diária automaticamente.")) {
+        const f = document.getElementById('formApprove');
+        f.action = `/swaps/action/${id}`;
+        f.submit();
+    }
+}
+
+function rejectSwap(id) {
+    const f = document.getElementById('formReject');
+    f.action = `/swaps/action/${id}`;
+    openModal('modalReject');
+}
+</script>
+
+<style>
+.kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top:20px; }
+.kpi-card { background:#1e1e1e; padding:15px; border-radius:10px; border:1px solid #333; text-align:center; }
+.kpi-value { font-size:1.8rem; font-weight:bold; color:#fff; }
+.kpi-label { font-size:0.8rem; color:#888; text-transform:uppercase; }
+.kpi-card.info { border-bottom:3px solid #3b82f6; }
+.kpi-card.success { border-bottom:3px solid #10b981; }
+.kpi-card.danger { border-bottom:3px solid #ef4444; }
+.badge { padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.75rem; text-transform:uppercase; }
+.badge.warning { background:#f59e0b; color:#222; }
+.badge.success { background:#10b981; color:#fff; }
+.badge.danger { background:#ef4444; color:#fff; }
+.radio-label { color: #ccc; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+</style>
 {% endblock %}
-
-
-
-

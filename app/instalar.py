@@ -495,7 +495,7 @@ w("app/manager.py", textwrap.dedent("""\
         month_start = date(today.year, today.month, 1)
         next_month = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
 
-        # Extras/Folgas pendentes no mÃªs
+        # Extras/Folgas pendentes no Mês
         extras = CoverageEvent.query.filter(
             CoverageEvent.coverage_type == CoverageType.EXTRA.value,
             CoverageEvent.created_at >= datetime(today.year, today.month, 1)
@@ -1021,7 +1021,7 @@ w("app/templates/manager/dashboard.html", textwrap.dedent("""\
   <div class="row g-3 mb-4">
     <div class="col-md-3">
       <div class="card p-3">
-        <div class="muted">Extras no mÃªs</div>
+        <div class="muted">Extras no Mês</div>
         <div class="display-6">{{ extras }}</div>
       </div>
     </div>
@@ -1092,7 +1092,7 @@ w("app/templates/manager/monthly_create.html", textwrap.dedent("""\
 {% block content %}
   <div class="card p-4">
     <h4 class="mb-1">Criar escala mensal</h4>
-    <div class="muted mb-3">Selecione o setor e o mÃªs. Depois vocÃª adiciona profissionais e turnos.</div>
+    <div class="muted mb-3">Selecione o setor e o Mês. Depois vocÃª adiciona profissionais e turnos.</div>
 
     <form method="post" class="row g-3">
       <div class="col-md-5">
@@ -1108,7 +1108,7 @@ w("app/templates/manager/monthly_create.html", textwrap.dedent("""\
         <input class="form-control" type="number" name="year" value="{{ (now() if false else '') }}" placeholder="2026" required />
       </div>
       <div class="col-md-2">
-        <label class="form-label">MÃªs</label>
+        <label class="form-label">Mês</label>
         <input class="form-control" type="number" min="1" max="12" name="month" placeholder="1" required />
       </div>
       <div class="col-12">
@@ -1368,7 +1368,7 @@ w("app/templates/nurse/dashboard.html", textwrap.dedent("""\
 {% block content %}
   <div class="hero rounded-4 p-4 mb-4">
     <h2 class="mb-1">Escala do dia (rÃ¡pida)</h2>
-    <div class="muted">Selecione setor, data e turno. O sistema sugere quem estÃ¡ escalado no mÃªs, e vocÃª ajusta trocas/remanejos.</div>
+    <div class="muted">Selecione setor, data e turno. O sistema sugere quem estÃ¡ escalado no Mês, e vocÃª ajusta trocas/remanejos.</div>
     <div class="mt-3">
       <a class="btn btn-primary" href="{{ url_for('nurse.daily') }}">Abrir escala do dia</a>
     </div>

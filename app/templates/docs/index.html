@@ -1,36 +1,135 @@
 ﻿{% extends "layouts/base.html" %}
 {% block content %}
-  <div class="row">
-    <h1>Documentos</h1>
-    {% if current_user.role in ['manager','admin'] %}
-      <a class="btn" href="{{ url_for('docs.upload') }}">Enviar documento</a>
-      <a class="btn secondary" href="{{ url_for('docs.report') }}">Relatório de leituras</a>
-    {% endif %}
+
+<div class="dash">
+  <div class="page-head">
+    <div class="page-head-left">
+      <h1>📚 Documentos</h1>
+      <div class="muted">Gestão de Protocolos, POPs e Manuais</div>
+    </div>
   </div>
 
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Título</th><th>Tipo</th><th>Setor</th><th>Status</th><th>Aberturas</th><th>Leitores</th><th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for d in docs %}
-        {% set agg = reads_map.get(d.id, {'opens':0,'users':0}) %}
-        <tr>
-          <td>{{ d.titulo }}</td>
-          <td>{{ d.tipo }}</td>
-          <td>{{ d.setor or "-" }}</td>
-          <td>{{ d.status }}</td>
-          <td>{{ agg.opens }}</td>
-          <td>{{ agg.users }}</td>
-          <td><a class="btn small" href="{{ url_for('docs.view', doc_id=d.id) }}">Abrir</a></td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+ <div class="kpi-grid" style="margin-top:14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+    
+    <div class="kpi-card info">
+        <div class="kpi-value">{{ stats['pop'] }}</div> <div class="kpi-label">POPS</div>
+    </div> <div class="kpi-card success">
+        <div class="kpi-value">{{ stats['protocolo'] or 0 }}</div>
+        <div class="kpi-label">Protocolos</div>
+    </div>
+
+    <div class="kpi-card" style="border-bottom:3px solid #a78bfa;">
+        <div class="kpi-value">{{ stats['manual'] or 0 }}</div>
+        <div class="kpi-label">Manuais</div>
+    </div>
+
+    <div class="kpi-card danger">
+        <div class="kpi-value">{{ stats['outros'] or 0 }}</div>
+        <div class="kpi-label">Outros</div>
+    </div>
+</div>
+
+  <!-- Filtros -->
+  <form class="card" method="GET" style="margin-top:18px;">
+    <div class="table-wrap" style="padding:14px;">
+      <div style="display:grid; grid-template-columns: 1fr 180px 140px; gap:12px; align-items:end;">
+        <div>
+          <label class="muted" style="display:block; margin-bottom:6px;">Pesquisar</label>
+          <input class="input" type="text" name="search" placeholder="Título do documento..."
+                 value="{{ search or '' }}">
+        </div>
+
+        <div>
+          <label class="muted" style="display:block; margin-bottom:6px;">Ano</label>
+          <select class="input" name="year">
+            <option value="">Todos os anos</option>
+            {% for y in years %}
+              <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="text-right">
+          <button type="submit" class="btn primary" style="width:100%;">Filtrar</button>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <!-- Tabela -->
+  <div class="card" style="margin-top:18px;">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Documento</th>
+            <th>Setor</th>
+            <th>Data</th>
+            <th>Acessos</th>
+            <th class="text-right">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if docs %}
+            {% for d in docs %}
+              <tr>
+                <td>
+                  <div style="font-weight:700;">{{ d.titulo }}</div>
+                  <div class="muted">{{ d.tipo }}</div>
+                </td>
+
+                <td>{{ d.setor or "Geral" }}</td>
+
+                <td>
+                  {% if d.created_at %}
+                    {{ d.created_at.strftime('%d/%m/%Y') }}
+                  {% else %}
+                    <span class="muted">—</span>
+                  {% endif %}
+                </td>
+
+                <td>{{ reads_map.get(d.id, {}).get('users', 0) }}</td>
+
+                <td class="text-right">
+                  {# ✅ use a rota que você TEM: /docs/file/<filename> #}
+                  {# Troque d.filename para o campo real do seu model #}
+                  {% if d.filename %}
+                    <a class="btn small" target="_blank" href="{{ url_for('docs.file', filename=d.filename) }}">Abrir</a>
+                  {% else %}
+                    <span class="muted">Sem arquivo</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="5" class="text-center muted" style="padding:26px;">
+                Nenhum documento encontrado com esses filtros.
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+/* reaproveitando o padrão que você já usa em Trocas */
+.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+@media (max-width: 980px){ .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 540px){ .kpi-grid { grid-template-columns: 1fr; } }
+
+.kpi-card { background: #1e1e1e; padding: 15px; border-radius: 10px; border: 1px solid #333; text-align: center; }
+.kpi-value { font-size: 1.8rem; font-weight: bold; color: #fff; }
+.kpi-label { font-size: 0.8rem; color: #888; text-transform: uppercase; }
+
+.kpi-card.info { border-bottom: 3px solid #3b82f6; }
+.kpi-card.success { border-bottom: 3px solid #10b981; }
+.kpi-card.danger { border-bottom: 3px solid #ef4444; }
+
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+</style>
+
 {% endblock %}
-
-
-
-

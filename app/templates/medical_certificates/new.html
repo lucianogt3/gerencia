@@ -1,0 +1,78 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+<div class="dash">
+
+  <div class="page-head">
+    <div class="page-head-left">
+      <h1>🩺 Novo Atestado</h1>
+      <div class="muted">
+        Após salvar, o registro fica travado (sem editar/apagar) e segue para aprovação.
+        CID é opcional. Data e dias são obrigatórios.
+      </div>
+    </div>
+    <div class="head-actions">
+      <a class="btn secondary" href="{{ url_for('medical_certificates.index') }}">← Voltar</a>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="panel" style="max-width: 960px;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    {% if is_manager %}
+    <div class="panel" style="margin-bottom:14px;">
+      <h3 style="margin:0 0 10px 0;">Lançamento manual (Gerente)</h3>
+      <div class="muted" style="margin-bottom:12px;">
+        Informe a matrícula. Nome/Setor/Turno serão puxados automaticamente do cadastro.
+      </div>
+
+      <div class="form-group">
+        <label>Matrícula do colaborador *</label>
+        <input class="input" type="text" name="matricula" required placeholder="Ex: 12345">
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="panel">
+      <div class="dash-grid" style="grid-template-columns: repeat(2, 1fr); gap: 14px;">
+        <div class="form-group">
+          <label>Data do atestado *</label>
+          <input class="input" type="date" name="data_atestado" required>
+        </div>
+
+        <div class="form-group">
+          <label>Qtd. dias de afastamento *</label>
+          <input class="input" type="number" name="dias" min="1" required>
+        </div>
+
+        <div class="form-group">
+          <label>CID (opcional)</label>
+          <input class="input" type="text" name="cid" placeholder="Ex: J18.9">
+        </div>
+
+        <div class="form-group">
+          <label>Anexo (PDF ou foto)</label>
+          <input class="input"
+                 type="file"
+                 name="file"
+                 accept="image/*,.pdf"
+                 capture="environment">
+          <div class="muted" style="margin-top:6px;">
+            Você pode tirar foto na hora (celular) ou anexar PDF/imagem.
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn primary" style="width:100%; margin-top: 14px; font-weight: 800;">
+        ✅ SALVAR E ENVIAR PARA APROVAÇÃO
+      </button>
+    </div>
+  </form>
+
+</div>
+
+<style>
+  @media (max-width: 860px) {
+    .dash-grid[style*="repeat(2"] { grid-template-columns: 1fr !important; }
+  }
+</style>
+{% endblock %}

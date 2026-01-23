@@ -1,47 +1,1860 @@
-﻿{% extends "base.html" %}
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle Diário - Enfermagem</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+    <style>
+        /* Estilos personalizados - Mantenha os mesmos que já tem */
+        :root {
+            --primary-color: #4361ee;
+            --secondary-color: #3a0ca3;
+            --success-color: #2ec4b6;
+            --danger-color: #e71d36;
+            --warning-color: #ff9f1c;
+            --dark-bg: #0d1117;
+            --darker-bg: #010409;
+            --card-bg: #161b22;
+            --border-color: #30363d;
+            --text-color: #c9d1d9;
+            --text-muted: #8b949e;
+        }
 
-{% block content %}
-<div class="nursing-monthly">
-    <div class="page-head">
-        <div class="page-head-left">
-            <h1>Escala Diária</h1>
-            <div class="muted">
-                <span class="status-dot active"></span> {{ current_date.strftime('%d/%m/%Y') }}
+        body {
+            background-color: var(--dark-bg);
+            color: var(--text-color);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        /* Layout principal */
+        .daily-dash {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Cabeçalho */
+        .page-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            gap: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .page-head-left h1 {
+            color: var(--text-color);
+            font-size: 1.8rem;
+            margin: 0 0 5px 0;
+            font-weight: 600;
+        }
+
+        .page-head-left .muted {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .page-head-right {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        /* Toolbar/Filtros */
+        .toolbar {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-item label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .filter-input, .select-filter {
+            background-color: var(--darker-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+            min-width: 150px;
+        }
+
+        .filter-input:focus, .select-filter:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.2);
+        }
+
+        /* KPIs/Cards de estatística */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 25px 0;
+        }
+
+        .kpi-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--primary-color);
+        }
+
+        .kpi-card.secondary {
+            border-left: 4px solid var(--text-muted);
+        }
+
+        .kpi-card.success {
+            border-left: 4px solid var(--success-color);
+        }
+
+        .kpi-card.danger {
+            border-left: 4px solid var(--danger-color);
+        }
+
+        .kpi-card.warning {
+            border-left: 4px solid var(--warning-color);
+        }
+
+        .kpi-icon {
+            width: 50px;
+            height: 50px;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .kpi-content {
+            flex: 1;
+        }
+
+        .kpi-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 5px;
+        }
+
+        .kpi-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .text-success { color: var(--success-color) !important; }
+        .text-danger { color: var(--danger-color) !important; }
+        .text-warning { color: var(--warning-color) !important; }
+
+        /* Tabela */
+        .master-table-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+        }
+
+        .table th {
+            background-color: rgba(255, 255, 255, 0.03);
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+
+        .table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            vertical-align: middle;
+        }
+
+        .table tbody tr {
+            transition: background-color 0.2s;
+        }
+
+        .table tbody tr:hover {
+            background-color: rgba(255, 255, 255, 0.03);
+        }
+
+        /* Badges de status */
+        .badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-align: center;
+            min-width: 100px;
+        }
+
+        .badge.waiting {
+            background-color: rgba(139, 148, 158, 0.1);
+            color: #8b949e;
+            border: 1px solid rgba(139, 148, 158, 0.2);
+        }
+
+        .badge.present {
+            background-color: rgba(46, 196, 182, 0.1);
+            color: var(--success-color);
+            border: 1px solid rgba(46, 196, 182, 0.2);
+        }
+
+        .badge.absent {
+            background-color: rgba(231, 29, 54, 0.1);
+            color: var(--danger-color);
+            border: 1px solid rgba(231, 29, 54, 0.2);
+        }
+
+        .badge.atestado {
+            background-color: rgba(255, 159, 28, 0.1);
+            color: var(--warning-color);
+            border: 1px solid rgba(255, 159, 28, 0.2);
+        }
+
+        .badge.coop {
+            background-color: rgba(106, 13, 173, 0.1);
+            color: #6a0dad;
+            border: 1px solid rgba(106, 13, 173, 0.2);
+        }
+
+        .badge.swap {
+            background-color: rgba(67, 97, 238, 0.1);
+            color: var(--primary-color);
+            border: 1px solid rgba(67, 97, 238, 0.2);
+        }
+
+        .badge.troca {
+            background-color: rgba(0, 184, 217, 0.1);
+            color: #00b8d9;
+            border: 1px solid rgba(0, 184, 217, 0.2);
+        }
+
+        /* Elementos da tabela */
+        .tag-sector {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: var(--text-color);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .shift-pill {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            line-height: 30px;
+            border-radius: 50%;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .shift-pill.day {
+            background-color: rgba(255, 159, 28, 0.1);
+            color: var(--warning-color);
+            border: 1px solid rgba(255, 159, 28, 0.3);
+        }
+
+        .shift-pill.night {
+            background-color: rgba(67, 97, 238, 0.1);
+            color: var(--primary-color);
+            border: 1px solid rgba(67, 97, 238, 0.3);
+        }
+
+        /* Botões de ação */
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+        }
+
+        .btn-action {
+            width: 32px;
+            height: 32px;
+            border-radius: 4px;
+            border: 1px solid transparent;
+            background-color: transparent;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+
+        .btn-present {
+            color: var(--success-color);
+            border-color: rgba(46, 196, 182, 0.3);
+        }
+
+        .btn-present:hover {
+            background-color: rgba(46, 196, 182, 0.1);
+        }
+
+        .btn-absent {
+            color: var(--danger-color);
+            border-color: rgba(231, 29, 54, 0.3);
+        }
+
+        .btn-absent:hover {
+            background-color: rgba(231, 29, 54, 0.1);
+        }
+
+        .btn-more {
+            color: var(--warning-color);
+            border-color: rgba(255, 159, 28, 0.3);
+        }
+
+        .btn-more:hover {
+            background-color: rgba(255, 159, 28, 0.1);
+        }
+
+        .btn-action:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .table-footer {
+            padding: 15px;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Botões gerais */
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .btn-primary:hover {
+            background-color: #3a56d4;
+            border-color: #3a56d4;
+        }
+
+        .btn-secondary {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: var(--text-color);
+            border-color: var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-color: var(--primary-color);
+        }
+
+        .btn-warning {
+            background-color: var(--warning-color);
+            color: white;
+            border-color: var(--warning-color);
+        }
+
+        .btn-warning:hover {
+            background-color: #e68a00;
+            border-color: #e68a00;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+        }
+
+        /* Modais personalizados */
+        .modal-dark .modal-content {
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+
+        .modal-dark .modal-header {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal-dark .modal-footer {
+            border-top: 1px solid var(--border-color);
+        }
+
+        .modal-dark .form-control,
+        .modal-dark .form-select {
+            background-color: var(--darker-bg);
+            border-color: var(--border-color);
+            color: var(--text-color);
+        }
+
+        .modal-dark .form-control:focus,
+        .modal-dark .form-select:focus {
+            background-color: var(--darker-bg);
+            border-color: var(--primary-color);
+            color: var(--text-color);
+            box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.2);
+        }
+
+        .avatar-md {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            margin: 0 auto;
+        }
+
+        .avatar-lg {
+            width: 80px;
+            height: 80px;
+        }
+
+        .avatar-title {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        /* Toast personalizado */
+        .toast-container {
+            z-index: 9999;
+        }
+
+        /* Utilitários */
+        .text-center {
+            text-align: center;
+        }
+
+        .text-white-80 {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .text-muted {
+            color: var(--text-muted) !important;
+        }
+
+        .small {
+            font-size: 0.875rem;
+        }
+
+        .x-small {
+            font-size: 0.75rem;
+        }
+
+        /* Responsividade */
+        @media (max-width: 992px) {
+            .kpi-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .daily-dash {
+                padding: 15px;
+            }
+
+            .page-head {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .page-head-right {
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            .filter-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .table th, .table td {
+                padding: 10px;
+            }
+
+            .action-buttons {
+                flex-wrap: wrap;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .btn {
+                width: 100%;
+            }
+
+            .page-head-right {
+                flex-direction: column;
+            }
+        }
+
+        /* Scrollbar personalizada */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--darker-bg);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Indicador de troca */
+        .swap-indicator {
+            font-size: 0.7rem;
+            color: #00b8d9;
+            margin-top: 2px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .swap-indicator i {
+            font-size: 0.6rem;
+        }
+        
+        /* Destaque para linha de troca */
+        .row-troca {
+            background-color: rgba(0, 184, 217, 0.05);
+        }
+        
+        .row-troca:hover {
+            background-color: rgba(0, 184, 217, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="daily-dash">
+        <!-- Cabeçalho com botões -->
+        <div class="page-head">
+            <div class="page-head-left">
+                <h1><i class="bi bi-clipboard-check me-2"></i>Controle Diário de Enfermagem</h1>
+                <div class="muted" id="currentDate">Carregando data...</div>
+            </div>
+            
+            <div class="page-head-right">
+                <a href="/nursing/indicators" class="btn btn-secondary" id="btnDashboard">
+                    <i class="bi bi-speedometer2 me-1"></i> Painel de Gestão
+                </a>
+                <button type="button" class="btn btn-primary" id="btnAddProfessional">
+                    <i class="bi bi-person-plus me-1"></i> Adicionar Profissional
+                </button>
+                <button type="button" class="btn btn-outline-info" id="btnLoadSwaps">
+                    <i class="bi bi-arrow-left-right me-1"></i> Carregar Trocas
+                </button>
             </div>
         </div>
-        <div class="head-actions">
-            <button class="btn small"><i class="icon-calendar"></i> Outro Dia</button>
-            <button class="btn small secondary"><i class="icon-print"></i> Imprimir</button>
+
+        <!-- Barra de Filtros -->
+        <div class="toolbar">
+            <div class="filter-group">
+                <div class="filter-item">
+                    <label class="small">Data:</label>
+                    <input type="date" name="date" class="input filter-input" id="filterDate">
+                </div>
+                
+                <div class="filter-item">
+                    <label class="small">Turno:</label>
+                    <select name="shift" class="input select-filter" id="filterShift">
+                        <option value="all">Todos</option>
+                        <option value="diurno">Diurno</option>
+                        <option value="noturno">Noturno</option>
+                    </select>
+                </div>
+
+                <div class="filter-item">
+                    <label class="small">Setor:</label>
+                    <select name="sector" class="input select-filter" id="filterSector">
+                        <option value="all">Todos</option>
+                        <!-- Setores serão carregados via JavaScript -->
+                    </select>
+                </div>
+
+                <div class="filter-item">
+                    <button type="button" class="btn btn-sm btn-primary" id="btnFilter">
+                        <i class="bi bi-funnel me-1"></i> Filtrar
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearFilters">
+                        <i class="bi bi-x-circle me-1"></i> Limpar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards de Estatísticas -->
+        <div class="kpi-grid">
+            <div class="kpi-card secondary">
+                <div class="kpi-icon">👥</div>
+                <div class="kpi-content">
+                    <div class="kpi-value" id="totalCount">0</div>
+                    <div class="kpi-label">TOTAL</div>
+                </div>
+            </div>
+            
+            <div class="kpi-card success">
+                <div class="kpi-icon">✅</div>
+                <div class="kpi-content">
+                    <div class="kpi-value text-success" id="presentCount">0</div>
+                    <div class="kpi-label">PRESENTES</div>
+                </div>
+            </div>
+            
+            <div class="kpi-card danger">
+                <div class="kpi-icon">❌</div>
+                <div class="kpi-content">
+                    <div class="kpi-value text-danger" id="absentCount">0</div>
+                    <div class="kpi-label">FALTAS</div>
+                </div>
+            </div>
+            
+            <div class="kpi-card warning">
+                <div class="kpi-icon">⏳</div>
+                <div class="kpi-content">
+                    <div class="kpi-value text-warning" id="pendingCount">0</div>
+                    <div class="kpi-label">PENDENTES</div>
+                </div>
+            </div>
+            
+            <div class="kpi-card" style="border-left: 4px solid #00b8d9;">
+                <div class="kpi-icon">🔄</div>
+                <div class="kpi-content">
+                    <div class="kpi-value" style="color: #00b8d9;" id="swapCount">0</div>
+                    <div class="kpi-label">TROCAS</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela de Profissionais -->
+        <div class="master-table-card">
+            <div class="table-wrap">
+                <table class="table" id="staffTable">
+                    <thead>
+                        <tr>
+                            <th>PROFISSIONAL</th>
+                            <th>TIPO</th>
+                            <th>SETOR</th>
+                            <th>TURNO</th>
+                            <th class="text-center">STATUS</th>
+                            <th class="text-center">AÇÕES</th>
+                        </tr>
+                    </thead>
+                    <tbody id="staffTableBody">
+                        <!-- Dados serão preenchidos via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="table-footer">
+                <div class="text-muted small">
+                    <span id="filteredCount">0</span> profissionais encontrados
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="panel">
-        <div class="panel-head">
-            <h2>Plantão do Dia</h2>
-            <div class="muted">Distribuição por setor</div>
-        </div>
-        <div class="table-wrap">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Colaborador</th>
-                        <th>Setor</th>
-                        <th>Turno</th>
-                        <th>Horário</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Exemplo Colaborador</td>
-                        <td>UTI</td>
-                        <td><span class="badge badge-active">Diurno</span></td>
-                        <td>07:00 - 19:00</td>
-                        <td><span class="status-dot active"></span> Presente</td>
-                    </tr>
-                </tbody>
-            </table>
+    <!-- Modal de Gerenciamento -->
+    <div class="modal fade modal-dark" id="modalGerenciamento" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-bold mb-0">Alterar Status</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                
+                <div class="modal-body py-3">
+                    <div class="text-center mb-3">
+                        <div class="avatar-md mx-auto mb-2 bg-primary bg-opacity-10 border border-primary rounded-circle">
+                            <i class="bi bi-person text-primary" style="font-size: 24px;"></i>
+                        </div>
+                        <h6 class="mb-1 small" id="nomeNoModal">Carregando...</h6>
+                        <p class="text-muted x-small mb-0" id="cargoNoModal">-</p>
+                        <p class="text-muted x-small mb-2" id="infoTrocaNoModal"></p>
+                    </div>
+                    
+                    <input type="hidden" id="recordUserIdNoModal">
+                    <input type="hidden" id="recordIdNoModal">
+                    <input type="hidden" id="recordTipoNoModal">
+                    <input type="hidden" id="dateNoModal">
+                    
+                    <div class="d-grid gap-2">
+                        <button type="button" onclick="salvarStatus('P')" class="btn btn-outline-success btn-sm py-2 d-flex align-items-center justify-content-center">
+                            <i class="bi bi-check-circle me-2"></i>
+                            <span>Confirmar Presença</span>
+                        </button>
+                        
+                        <button type="button" onclick="salvarStatus('F')" class="btn btn-outline-danger btn-sm py-2 d-flex align-items-center justify-content-center">
+                            <i class="bi bi-x-circle me-2"></i>
+                            <span>Registrar Falta</span>
+                        </button>
+                        
+                        <button type="button" onclick="salvarStatus('AT')" class="btn btn-outline-warning btn-sm py-2 d-flex align-items-center justify-content-center">
+                            <i class="bi bi-file-text me-2"></i>
+                            <span>Registrar Atestado</span>
+                        </button>
+
+                        <button type="button" onclick="salvarStatus('AGUARDANDO')" class="btn btn-outline-secondary btn-sm py-2 d-flex align-items-center justify-content-center">
+                            <i class="bi bi-clock me-2"></i>
+                            <span>Aguardando</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-</div>
-{% endblock %}
+
+    <!-- Modal de Escolha do Tipo de Profissional -->
+    <div class="modal fade modal-dark" id="modalTipoProfissional" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Tipo de Profissional</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-3">
+                        <div class="avatar-lg mx-auto mb-2 bg-primary bg-opacity-10 border border-primary rounded-circle">
+                            <i class="bi bi-person-plus text-primary" style="font-size: 32px;"></i>
+                        </div>
+                        <h6>Selecione o tipo de profissional</h6>
+                    </div>
+                    
+                    <div class="d-grid gap-3">
+                        <button type="button" class="btn btn-outline-primary btn-lg py-3 d-flex align-items-center justify-content-center"
+                                onclick="abrirModalBuscarProfissional()">
+                            <i class="bi bi-person-check me-3" style="font-size: 24px;"></i>
+                            <div class="text-start">
+                                <div class="fw-bold">Profissional Fixo</div>
+                                <small class="text-muted">Da equipe permanente</small>
+                            </div>
+                        </button>
+                        
+                        <button type="button" class="btn btn-outline-warning btn-lg py-3 d-flex align-items-center justify-content-center"
+                                onclick="abrirModalCooperativa()">
+                            <i class="bi bi-people me-3" style="font-size: 24px;"></i>
+                            <div class="text-start">
+                                <div class="fw-bold">Cooperativa</div>
+                                <small class="text-muted">Profissional terceirizado</small>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Buscar Profissional Fixo -->
+    <div class="modal fade modal-dark" id="modalBuscarProfissional" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-search me-2"></i> Buscar Profissional
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label text-white-80">Buscar por nome ou matrícula:</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="searchProfessional" 
+                                   placeholder="Digite o nome ou matrícula...">
+                            <button class="btn btn-outline-primary" type="button" onclick="buscarProfissionais()">
+                                <i class="bi bi-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="professionalsList" class="mt-3" style="max-height: 300px; overflow-y: auto;">
+                        <!-- Lista de profissionais será preenchida aqui -->
+                        <div class="text-center text-muted">
+                            Digite para buscar profissionais
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Cooperativa -->
+    <div class="modal fade modal-dark" id="modalCooperativa" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-people me-2"></i> Adicionar Cooperativa
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formCooperativa">
+                        <div class="mb-3">
+                            <label class="form-label text-white-80">Nome do Profissional *</label>
+                            <input type="text" class="form-control" id="nomeCoop" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-white-80">COREN *</label>
+                            <input type="text" class="form-control" id="corenCoop" required placeholder="Ex: COREN-XX 123456">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-white-80">Cargo *</label>
+                            <select class="form-select" id="cargoCoop" required>
+                                <option value="">Selecione o cargo</option>
+                                <option value="Enfermeiro Cooperativa">Enfermeiro (Cooperativa)</option>
+                                <option value="Técnico de Enfermagem Cooperativa">Técnico de Enfermagem (Cooperativa)</option>
+                                <option value="Auxiliar de Enfermagem Cooperativa">Auxiliar de Enfermagem (Cooperativa)</option>
+                                <option value="Médico Cooperativa">Médico (Cooperativa)</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-white-80">Setor *</label>
+                            <select class="form-select" id="setorCoop" required>
+                                <option value="">Carregando setores...</option>
+                            </select>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label text-white-80">Turno *</label>
+                                <select class="form-select" id="turnoCoop" required>
+                                    <option value="D">Diurno (07:00 - 18:59)</option>
+                                    <option value="N">Noturno (19:00 - 06:59)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label text-white-80">Status *</label>
+                                <select class="form-select" id="statusCoop" required>
+                                    <option value="AGUARDANDO">Aguardando</option>
+                                    <option value="P">Presente</option>
+                                    <option value="F">Falta</option>
+                                    <option value="AT">Atestado</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-white-80">Observações</label>
+                            <textarea class="form-control" id="obsCoop" rows="2" placeholder="Empresa de origem, contrato, etc."></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-warning" onclick="salvarCooperativa()">
+                        <i class="bi bi-save me-1"></i> Salvar Cooperativa
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Variáveis globais
+        let setoresData = [];
+        let dailyRecords = [];
+        let currentDate = new Date().toISOString().split('T')[0];
+        let selectedSector = 'all';
+        let selectedShift = 'all';
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            // Inicializar modais
+            const modalGerenciamento = new bootstrap.Modal(document.getElementById('modalGerenciamento'));
+            const modalTipoProfissional = new bootstrap.Modal(document.getElementById('modalTipoProfissional'));
+            const modalBuscarProfissional = new bootstrap.Modal(document.getElementById('modalBuscarProfissional'));
+            const modalCooperativa = new bootstrap.Modal(document.getElementById('modalCooperativa'));
+
+            // Armazenar referências globais
+            window.modalRef = modalGerenciamento;
+            window.modalTipoRef = modalTipoProfissional;
+            window.modalBuscarRef = modalBuscarProfissional;
+            window.modalCoopRef = modalCooperativa;
+
+            // Configurar data atual
+            const today = new Date();
+            const formattedDate = today.toISOString().split('T')[0];
+            const formattedDateBR = today.toLocaleDateString('pt-BR');
+            
+            document.getElementById('currentDate').textContent = `Data: ${formattedDateBR}`;
+            document.getElementById('filterDate').value = formattedDate;
+            document.getElementById('dateNoModal').value = formattedDate;
+            currentDate = formattedDate;
+
+            // Configurar eventos dos botões
+            document.getElementById('btnAddProfessional').addEventListener('click', abrirModalTipoProfissional);
+            document.getElementById('btnFilter').addEventListener('click', applyFilters);
+            document.getElementById('btnClearFilters').addEventListener('click', clearFilters);
+            document.getElementById('btnLoadSwaps').addEventListener('click', loadSwaps);
+
+            // Carregar setores do banco de dados
+            carregarSetoresBD();
+
+            // Carregar registros do dia
+            loadDailyRecords();
+
+            // Atualizar data quando mudar no filtro
+            document.getElementById('filterDate').addEventListener('change', function() {
+                currentDate = this.value;
+                const dateObj = new Date(this.value);
+                const formattedDateBR = dateObj.toLocaleDateString('pt-BR');
+                document.getElementById('currentDate').textContent = `Data: ${formattedDateBR}`;
+                document.getElementById('dateNoModal').value = currentDate;
+                loadDailyRecords();
+            });
+
+            document.getElementById('filterSector').addEventListener('change', function() {
+                selectedSector = this.value;
+                applyFilters();
+            });
+
+            document.getElementById('filterShift').addEventListener('change', function() {
+                selectedShift = this.value;
+                applyFilters();
+            });
+        });
+
+        // Carregar setores do backend
+        async function carregarSetoresBD() {
+            try {
+                const response = await fetch('/nursing/api/sectors');
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP: ${response.status}`);
+                }
+                const data = await response.json();
+                
+                if (data.success) {
+                    setoresData = data.setores;
+                    
+                    // Preencher selects
+                    const selectCoop = document.getElementById('setorCoop');
+                    const filterSector = document.getElementById('filterSector');
+                    
+                    // Limpar options
+                    selectCoop.innerHTML = '<option value="">Selecione o setor</option>';
+                    filterSector.innerHTML = '<option value="all">Todos</option>';
+                    
+                    // Adicionar options para cada setor
+                    setoresData.forEach(setor => {
+                        const optionCoop = document.createElement('option');
+                        optionCoop.value = setor.id;
+                        optionCoop.textContent = setor.nome;
+                        selectCoop.appendChild(optionCoop);
+                        
+                        const optionFilter = document.createElement('option');
+                        optionFilter.value = setor.id;
+                        optionFilter.textContent = setor.nome;
+                        filterSector.appendChild(optionFilter);
+                    });
+                } else {
+                    showToast('Erro ao carregar setores', 'error');
+                }
+            } catch (error) {
+                console.error('Erro ao carregar setores:', error);
+                showToast('Erro ao carregar setores do banco de dados', 'error');
+                
+                // Fallback para dados de exemplo
+                const fallbackSetores = [
+                    { id: 1, nome: "CENTRO CIRURGICO" },
+                    { id: 2, nome: "CME" },
+                    { id: 3, nome: "INTERNACAO 1° ANDAR" },
+                    { id: 4, nome: "INTERNACAO 2° ANDAR" }
+                ];
+                
+                setoresData = fallbackSetores;
+                preencherSelectSetores(fallbackSetores);
+            }
+        }
+
+        // Função auxiliar para preencher os selects
+        function preencherSelectSetores(setores) {
+            const selectCoop = document.getElementById('setorCoop');
+            const filterSector = document.getElementById('filterSector');
+            
+            selectCoop.innerHTML = '<option value="">Selecione o setor</option>';
+            filterSector.innerHTML = '<option value="all">Todos</option>';
+            
+            setores.forEach(setor => {
+                const optionCoop = document.createElement('option');
+                optionCoop.value = setor.id;
+                optionCoop.textContent = setor.nome;
+                selectCoop.appendChild(optionCoop);
+                
+                const optionFilter = document.createElement('option');
+                optionFilter.value = setor.id;
+                optionFilter.textContent = setor.nome;
+                filterSector.appendChild(optionFilter);
+            });
+        }
+
+        // Carregar registros diários - CORRIGIDA
+        async function loadDailyRecords() {
+            try {
+                showLoading(true);
+                
+                const params = new URLSearchParams({
+                    date: currentDate,
+                    sector: selectedSector,
+                    shift_type: selectedShift
+                });
+                
+                // Usar a rota API do nursing
+                const response = await fetch(`/nursing/api/daily?${params}`);
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Erro ao carregar dados');
+                }
+                
+                dailyRecords = data.daily_records || [];
+                
+                console.log('Registros carregados:', dailyRecords); // Para debug
+                
+                // Atualizar tabela
+                renderTable();
+                
+                // Atualizar estatísticas
+                updateStatistics(data.stats);
+                
+                showToast('Registros carregados com sucesso', 'success');
+                
+            } catch (error) {
+                console.error('Erro ao carregar registros:', error);
+                showToast('Erro ao carregar registros do dia: ' + error.message, 'error');
+                dailyRecords = [];
+                renderTable();
+                updateStatistics({ 
+                    total: 0, 
+                    present: 0, 
+                    coop: 0, 
+                    absent: 0, 
+                    pending: 0,
+                    swap: 0
+                });
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Carregar trocas aprovadas - AGORA SÓ CARREGA TROCAS APROVADAS
+        async function loadSwaps() {
+            try {
+                showLoading(true);
+                
+                // Buscar trocas aprovadas para a data atual
+                const response = await fetch(`/nursing/api/swaps/approved?date=${currentDate}`);
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Erro ao carregar trocas');
+                }
+                
+                if (data.count === 0) {
+                    showToast('Nenhuma troca aprovada para esta data', 'info');
+                    return;
+                }
+                
+                // Processar cada troca aprovada
+                data.swaps.forEach(swap => {
+                    // Verificar se o substituto já está na lista
+                    const existingSubstituteIndex = dailyRecords.findIndex(r => 
+                        r.user_id === swap.substitute_user_id && r.tipo === 'TROCA'
+                    );
+                    
+                    if (existingSubstituteIndex === -1) {
+                        // Adicionar substituto como um registro de troca
+                        dailyRecords.push({
+                            id: `swap_${swap.substitute_user_id}_${swap.id}`,
+                            user_id: swap.substitute_user_id,
+                            name: swap.substitute_user_name,
+                            cargo: "Substituto",
+                            sector_name: swap.sector_name,
+                            sector_id: swap.sector_id,
+                            shift: swap.shift,
+                            status: "AGUARDANDO",
+                            tipo: "TROCA",
+                            horario: swap.shift === 'D' ? "07:00 - 19:00" : "19:00 - 07:00",
+                            swap_info: {
+                                requester_name: swap.original_user_name,
+                                original_user_id: swap.original_user_id,
+                                swap_id: swap.id,
+                                is_substitute: true,
+                                is_approved: true
+                            }
+                        });
+                    }
+                    
+                    // Atualizar o registro original para marcar como troca
+                    const originalIndex = dailyRecords.findIndex(r => 
+                        r.user_id === swap.original_user_id
+                    );
+                    
+                    if (originalIndex !== -1) {
+                        dailyRecords[originalIndex].tipo = 'TROCA';
+                        dailyRecords[originalIndex].swap_info = {
+                            substitute_name: swap.substitute_user_name,
+                            substitute_user_id: swap.substitute_user_id,
+                            swap_id: swap.id,
+                            is_substitute: false,
+                            is_approved: true
+                        };
+                    }
+                });
+                
+                // Atualizar tabela
+                renderTable();
+                updateStatisticsFromRecords();
+                
+                showToast(`${data.count} troca(s) aprovada(s) carregada(s) com sucesso`, 'success');
+                
+            } catch (error) {
+                console.error('Erro ao carregar trocas:', error);
+                showToast('Erro ao carregar trocas: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Obter ID do setor pelo nome
+        function getSectorIdByName(sectorName) {
+            const sector = setoresData.find(s => s.nome === sectorName);
+            return sector ? sector.id : null;
+        }
+
+        // Função para escapar HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Renderizar tabela - CORRIGIDA
+        function renderTable() {
+            const tbody = document.getElementById('staffTableBody');
+            tbody.innerHTML = '';
+
+            if (dailyRecords.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center py-5">
+                            <div class="text-muted">
+                                <i class="bi bi-clipboard-x" style="font-size: 48px;"></i>
+                                <p class="mt-3">Nenhum registro encontrado para esta data</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            dailyRecords.forEach(record => {
+                const statusBadge = getStatusBadge(record.status);
+                const shiftPill = record.shift === 'D' ? 
+                    '<span class="shift-pill day">D</span>' : 
+                    '<span class="shift-pill night">N</span>';
+                
+                const tipoBadge = getTipoBadge(record.tipo);
+                
+                // Verificar se é uma troca
+                const isSwap = record.tipo === 'TROCA';
+                
+                // Determinar se é substituto
+                const isSubstitute = isSwap && record.swap_info && record.swap_info.is_substitute;
+                const isOriginal = isSwap && record.swap_info && !record.swap_info.is_substitute;
+                
+                // Criar indicador de troca APENAS para substitutos
+                let swapIndicator = '';
+                if (isSubstitute && record.swap_info && record.swap_info.requester_name) {
+                    swapIndicator = `
+                        <div class="swap-indicator">
+                            <i class="bi bi-arrow-left-right"></i>
+                            Substituindo: ${escapeHtml(record.swap_info.requester_name)}
+                        </div>
+                    `;
+                } else if (isOriginal && record.swap_info && record.swap_info.substitute_name) {
+                    swapIndicator = `
+                        <div class="swap-indicator">
+                            <i class="bi bi-arrow-left-right"></i>
+                            Sendo substituído por: ${escapeHtml(record.swap_info.substitute_name)}
+                        </div>
+                    `;
+                }
+                
+                // Determinar texto do cargo
+                let cargoDisplay = escapeHtml(record.cargo);
+                if (isSubstitute) {
+                    cargoDisplay = 'Substituto';
+                }
+
+                // Determinar classe da linha
+                const rowClass = isSwap ? 'row-troca' : '';
+
+                const actionButtons = record.status === 'P' || record.status === 'F' || record.status === 'AT' || record.status === 'COOP' ?
+                    `<div class="action-buttons">
+                        <button type="button" class="btn-action btn-more"
+                                onclick="abrirModalStatus('${record.id}', ${record.user_id}, '${escapeHtml(record.name)}', '${escapeHtml(record.cargo)}', '${record.tipo}')"
+                                title="Alterar status">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                    </div>` :
+                    `<div class="action-buttons">
+                        <button type="button" class="btn-action btn-present" 
+                                onclick="quickAction('${record.id}', ${record.user_id}, 'P')"
+                                data-record-id="${record.id}"
+                                title="Confirmar Presença">
+                            ✓
+                        </button>
+                        <button type="button" class="btn-action btn-absent"
+                                onclick="quickAction('${record.id}', ${record.user_id}, 'F')"
+                                data-record-id="${record.id}"
+                                title="Registrar Falta">
+                            ✗
+                        </button>
+                        <button type="button" class="btn-action btn-more"
+                                onclick="abrirModalStatus('${record.id}', ${record.user_id}, '${escapeHtml(record.name)}', '${escapeHtml(record.cargo)}', '${record.tipo}')"
+                                title="Mais opções">
+                            ⋯
+                        </button>
+                    </div>`;
+
+                const row = `
+                    <tr class="row-item ${rowClass}" 
+                        data-record-id="${record.id}"
+                        data-user-id="${record.user_id}"
+                        data-status="${record.status}" 
+                        data-sector="${record.sector_id}"
+                        data-shift="${record.shift}"
+                        data-tipo="${record.tipo}"
+                        id="row-${record.id}">
+                        <td>
+                            <div style="font-weight: bold; color: #eee;">${escapeHtml(record.name)}</div>
+                            <div class="muted" style="font-size: 0.8rem;">${cargoDisplay}</div>
+                            ${swapIndicator}
+                        </td>
+                        <td>
+                            ${tipoBadge}
+                        </td>
+                        <td>
+                            <span class="tag-sector">${escapeHtml(record.sector_name)}</span>
+                        </td>
+                        <td>
+                            ${shiftPill}
+                            <div class="text-muted x-small mt-1">${escapeHtml(record.horario)}</div>
+                        </td>
+                        <td class="text-center" id="status-cell-${record.id}">
+                            ${statusBadge}
+                        </td>
+                        <td class="text-center" id="actions-cell-${record.id}">
+                            ${actionButtons}
+                        </td>
+                    </tr>
+                `;
+                
+                tbody.innerHTML += row;
+            });
+        }
+
+        // Obter badge de tipo
+        function getTipoBadge(tipo) {
+            switch(tipo) {
+                case 'FIXO':
+                    return '<span class="badge" style="background-color: rgba(67, 97, 238, 0.1); color: #4361ee; border: 1px solid rgba(67, 97, 238, 0.2);">Fixo</span>';
+                case 'COOP':
+                    return '<span class="badge coop">Cooperativa</span>';
+                case 'TROCA':
+                    return '<span class="badge troca">Troca</span>';
+                default:
+                    return '<span class="badge">-</span>';
+            }
+        }
+
+        // Obter badge de status
+        function getStatusBadge(status) {
+            switch(status) {
+                case 'AGUARDANDO':
+                    return '<span class="badge waiting">⏳ Aguardando</span>';
+                case 'P':
+                    return '<span class="badge present">✅ Presente</span>';
+                case 'F':
+                    return '<span class="badge absent">❌ Falta</span>';
+                case 'AT':
+                    return '<span class="badge atestado">📄 Atestado</span>';
+                case 'COOP':
+                    return '<span class="badge coop">🤝 Cooperativa</span>';
+                default:
+                    return '<span class="badge waiting">⏳ Aguardando</span>';
+            }
+        }
+
+        // Aplicar filtros
+        function applyFilters() {
+            currentDate = document.getElementById('filterDate').value;
+            selectedSector = document.getElementById('filterSector').value;
+            selectedShift = document.getElementById('filterShift').value;
+            
+            loadDailyRecords();
+        }
+
+        // Limpar filtros
+        function clearFilters() {
+            const today = new Date();
+            const formattedDate = today.toISOString().split('T')[0];
+            
+            document.getElementById('filterDate').value = formattedDate;
+            document.getElementById('filterSector').value = 'all';
+            document.getElementById('filterShift').value = 'all';
+            
+            currentDate = formattedDate;
+            selectedSector = 'all';
+            selectedShift = 'all';
+            
+            loadDailyRecords();
+        }
+
+        // Atualizar estatísticas
+        function updateStatistics(stats) {
+            document.getElementById('totalCount').textContent = stats.total;
+            document.getElementById('presentCount').textContent = stats.present;
+            document.getElementById('absentCount').textContent = stats.absent;
+            document.getElementById('pendingCount').textContent = stats.pending;
+            document.getElementById('swapCount').textContent = stats.swap;
+            document.getElementById('filteredCount').textContent = stats.total;
+        }
+
+        // Atualizar estatísticas a partir dos registros
+        function updateStatisticsFromRecords() {
+            const total = dailyRecords.length;
+            const present = dailyRecords.filter(r => r.status === 'P').length;
+            const absent = dailyRecords.filter(r => r.status === 'F' || r.status === 'AT').length;
+            const pending = dailyRecords.filter(r => r.status === 'AGUARDANDO').length;
+            const coop = dailyRecords.filter(r => r.tipo === 'COOP').length;
+            const swap = dailyRecords.filter(r => r.tipo === 'TROCA').length;
+            
+            updateStatistics({
+                total,
+                present,
+                absent,
+                pending,
+                coop,
+                swap
+            });
+        }
+
+        // Abrir modal de escolha do tipo
+        function abrirModalTipoProfissional() {
+            if (window.modalTipoRef) {
+                window.modalTipoRef.show();
+            }
+        }
+
+        // Abrir modal para buscar profissional
+        function abrirModalBuscarProfissional() {
+            if (window.modalTipoRef) window.modalTipoRef.hide();
+            if (window.modalBuscarRef) {
+                document.getElementById('searchProfessional').value = '';
+                document.getElementById('professionalsList').innerHTML = `
+                    <div class="text-center text-muted">
+                        Digite para buscar profissionais
+                    </div>
+                `;
+                window.modalBuscarRef.show();
+            }
+        }
+
+        // Buscar profissionais
+        async function buscarProfissionais() {
+            const query = document.getElementById('searchProfessional').value.trim();
+            
+            if (query.length < 2) {
+                document.getElementById('professionalsList').innerHTML = `
+                    <div class="text-center text-muted">
+                        Digite pelo menos 2 caracteres
+                    </div>
+                `;
+                return;
+            }
+            
+            try {
+                showLoading(true);
+                
+                const response = await fetch(`/nursing/api/users/search?q=${encodeURIComponent(query)}`);
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                const professionalsList = document.getElementById('professionalsList');
+                professionalsList.innerHTML = '';
+                
+                if (!data.items || data.items.length === 0) {
+                    professionalsList.innerHTML = `
+                        <div class="text-center text-muted">
+                            Nenhum profissional encontrado
+                        </div>
+                    `;
+                    return;
+                }
+                
+                data.items.forEach(prof => {
+                    const profElement = document.createElement('div');
+                    profElement.className = 'card mb-2';
+                    profElement.style.backgroundColor = 'var(--darker-bg)';
+                    profElement.style.border = '1px solid var(--border-color)';
+                    
+                    profElement.innerHTML = `
+                        <div class="card-body py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1" style="color: var(--text-color);">${escapeHtml(prof.name)}</h6>
+                                    <small class="text-muted">${escapeHtml(prof.role_label || '')} • ${escapeHtml(prof.matricula || '')}</small>
+                                    <div class="mt-1">
+                                        <small class="badge bg-primary">${escapeHtml(prof.turno || 'Não definido')}</small>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-primary" 
+                                        onclick="adicionarProfissionalFixo(${prof.id}, '${escapeHtml(prof.name)}', '${escapeHtml(prof.role_label || '')}')">
+                                    <i class="bi bi-plus"></i> Adicionar
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    professionalsList.appendChild(profElement);
+                });
+                
+            } catch (error) {
+                console.error('Erro ao buscar profissionais:', error);
+                showToast('Erro ao buscar profissionais: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Adicionar profissional fixo
+        async function adicionarProfissionalFixo(userId, nome, cargo) {
+            try {
+                // Fechar modais
+                if (window.modalBuscarRef) window.modalBuscarRef.hide();
+                
+                // Preparar dados para enviar
+                const dados = {
+                    user_id: userId,
+                    date: currentDate,
+                    status: 'AGUARDANDO',
+                    // Você precisa determinar o setor e turno do usuário
+                    // Isso pode exigir uma consulta adicional
+                };
+                
+                // Usar a rota correta do nursing
+                const addResponse = await fetch('/nursing/daily/add_professional', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(dados)
+                });
+                
+                const result = await addResponse.json();
+                
+                if (!result.success) {
+                    throw new Error(result.error || 'Erro ao adicionar profissional');
+                }
+                
+                showToast('Profissional adicionado com sucesso!', 'success');
+                
+                // Recarregar registros
+                loadDailyRecords();
+                
+            } catch (error) {
+                console.error('Erro ao adicionar profissional:', error);
+                showToast('Erro ao adicionar profissional: ' + error.message, 'error');
+            }
+        }
+
+        // Abrir modal de cooperativa
+        function abrirModalCooperativa() {
+            if (window.modalTipoRef) window.modalTipoRef.hide();
+            if (window.modalCoopRef) {
+                document.getElementById('formCooperativa').reset();
+                window.modalCoopRef.show();
+            }
+        }
+
+        // Abrir modal de status - CORRIGIDA
+        function abrirModalStatus(recordId, userId, nome, cargo, tipo) {
+            document.getElementById('recordIdNoModal').value = recordId;
+            document.getElementById('recordUserIdNoModal').value = userId;
+            document.getElementById('recordTipoNoModal').value = tipo;
+            document.getElementById('nomeNoModal').textContent = nome;
+            document.getElementById('cargoNoModal').textContent = cargo;
+            document.getElementById('dateNoModal').value = currentDate;
+            
+            // Adicionar informação sobre troca se for o caso
+            const infoTroca = document.getElementById('infoTrocaNoModal');
+            const record = dailyRecords.find(r => r.id === recordId);
+            
+            if (record && record.tipo === 'TROCA' && record.swap_info) {
+                if (record.swap_info.is_substitute && record.swap_info.requester_name) {
+                    infoTroca.textContent = `Substituindo: ${record.swap_info.requester_name}`;
+                } else if (!record.swap_info.is_substitute && record.swap_info.substitute_name) {
+                    infoTroca.textContent = `Sendo substituído por: ${record.swap_info.substitute_name}`;
+                }
+            } else {
+                infoTroca.textContent = '';
+            }
+            
+            if (window.modalRef) {
+                window.modalRef.show();
+            }
+        }
+
+        // Salvar cooperativa
+        async function salvarCooperativa() {
+            const form = document.getElementById('formCooperativa');
+            
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+            
+            const setorSelect = document.getElementById('setorCoop');
+            const setorId = setorSelect.value;
+            
+            if (!setorId) {
+                showToast('Por favor, selecione um setor', 'error');
+                return;
+            }
+            
+            // Para cooperativa, criamos um usuário temporário
+            const tempUserId = -Math.floor(Math.random() * 10000);
+            
+            const dados = {
+                user_id: tempUserId,
+                date: currentDate,
+                status: document.getElementById('statusCoop').value,
+                sector_id: parseInt(setorId),
+                shift: document.getElementById('turnoCoop').value,
+                // Campos específicos para cooperativa
+                coop_name: document.getElementById('nomeCoop').value,
+                coop_coren: document.getElementById('corenCoop').value,
+                coop_role: document.getElementById('cargoCoop').value,
+                observations: document.getElementById('obsCoop').value,
+                tipo: 'COOP'
+            };
+            
+            try {
+                const response = await fetch('/nursing/daily/add_professional', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(dados)
+                });
+                
+                const result = await response.json();
+                
+                if (!result.success) {
+                    throw new Error(result.error || 'Erro ao salvar');
+                }
+                
+                window.modalCoopRef.hide();
+                showToast('Cooperativa adicionada com sucesso!', 'success');
+                
+                // Recarregar registros
+                loadDailyRecords();
+                
+            } catch (error) {
+                console.error('Erro ao salvar cooperativa:', error);
+                showToast('Erro ao salvar cooperativa: ' + error.message, 'error');
+            }
+        }
+
+        // Ação rápida - CORRIGIDA
+        async function quickAction(recordId, userId, status) {
+            const buttons = document.querySelectorAll(`.btn-action[data-record-id="${recordId}"]`);
+            buttons.forEach(btn => btn.disabled = true);
+            
+            try {
+                const response = await fetch('/nursing/daily/update_status', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        record_id: recordId,
+                        user_id: userId,
+                        date: currentDate, 
+                        status: status 
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (!result.success) {
+                    throw new Error(result.error || 'Erro ao atualizar');
+                }
+                
+                // Atualizar localmente
+                const recordIndex = dailyRecords.findIndex(r => r.id === recordId);
+                if (recordIndex !== -1) {
+                    dailyRecords[recordIndex].status = status;
+                    updateRowStatus(recordId, status);
+                }
+                
+                showToast(status === 'P' ? '✅ Presença confirmada' : '❌ Falta registrada', 'success');
+                
+            } catch (error) {
+                console.error('Erro na ação rápida:', error);
+                showToast('Erro ao atualizar status: ' + error.message, 'error');
+                buttons.forEach(btn => btn.disabled = false);
+            }
+        }
+
+        // Atualizar linha individual
+        function updateRowStatus(recordId, status) {
+            const row = document.getElementById(`row-${recordId}`);
+            const statusCell = document.getElementById(`status-cell-${recordId}`);
+            const actionsCell = document.getElementById(`actions-cell-${recordId}`);
+            
+            if (!row || !statusCell || !actionsCell) return;
+            
+            row.setAttribute('data-status', status);
+            statusCell.innerHTML = getStatusBadge(status);
+            
+            // Se for status confirmado, alterar botões
+            const record = dailyRecords.find(r => r.id === recordId);
+            if (record && (status === 'P' || status === 'F' || status === 'AT' || status === 'COOP')) {
+                actionsCell.innerHTML = `
+                    <div class="action-buttons">
+                        <button type="button" class="btn-action btn-more"
+                                onclick="abrirModalStatus('${recordId}', ${record.user_id}, '${escapeHtml(record?.name || '')}', '${escapeHtml(record?.cargo || '')}', '${record?.tipo || ''}')"
+                                title="Alterar status">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                    </div>
+                `;
+            }
+            
+            updateStatisticsFromRecords();
+        }
+
+        // Salvar status via modal - CORRIGIDA
+        async function salvarStatus(status) {
+            const recordId = document.getElementById('recordIdNoModal').value;
+            const userId = document.getElementById('recordUserIdNoModal').value;
+            
+            if (!recordId || !userId) {
+                showToast('ID do registro não encontrado', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/nursing/daily/update_status', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        record_id: recordId,
+                        user_id: userId,
+                        date: currentDate, 
+                        status: status 
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (!result.success) {
+                    throw new Error(result.error || 'Erro ao atualizar');
+                }
+                
+                // Atualizar localmente
+                const recordIndex = dailyRecords.findIndex(r => r.id === recordId);
+                if (recordIndex !== -1) {
+                    dailyRecords[recordIndex].status = status;
+                    updateRowStatus(recordId, status);
+                }
+                
+                window.modalRef.hide();
+                showToast('Status atualizado com sucesso!', 'success');
+                
+            } catch (error) {
+                console.error('Erro ao salvar status:', error);
+                showToast('Erro ao atualizar status: ' + error.message, 'error');
+            }
+        }
+
+        // Sistema de notificação Toast
+        function showToast(message, type = 'info') {
+            let container = document.querySelector('.toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.className = 'toast-container position-fixed top-0 end-0 p-3';
+                container.style.zIndex = '9999';
+                document.body.appendChild(container);
+            }
+            
+            const toastId = 'toast-' + Date.now();
+            const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
+            const bgClass = type === 'success' ? 'bg-success' : type === 'error' ? 'bg-danger' : 'bg-info';
+            
+            const toastHtml = `
+                <div id="${toastId}" class="toast ${bgClass} text-white border-0" role="alert">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            ${icon} ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                </div>
+            `;
+            
+            container.innerHTML += toastHtml;
+            const toastElement = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastElement, { delay: 3000 });
+            toast.show();
+            
+            toastElement.addEventListener('hidden.bs.toast', function() {
+                toastElement.remove();
+            });
+        }
+
+        // Mostrar/ocultar loading
+        function showLoading(show) {
+            if (show) {
+                let loadingOverlay = document.getElementById('loadingOverlay');
+                if (!loadingOverlay) {
+                    loadingOverlay = document.createElement('div');
+                    loadingOverlay.id = 'loadingOverlay';
+                    loadingOverlay.style.position = 'fixed';
+                    loadingOverlay.style.top = '0';
+                    loadingOverlay.style.left = '0';
+                    loadingOverlay.style.width = '100%';
+                    loadingOverlay.style.height = '100%';
+                    loadingOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+                    loadingOverlay.style.zIndex = '9998';
+                    loadingOverlay.style.display = 'flex';
+                    loadingOverlay.style.alignItems = 'center';
+                    loadingOverlay.style.justifyContent = 'center';
+                    
+                    const spinner = document.createElement('div');
+                    spinner.className = 'spinner-border text-primary';
+                    spinner.style.width = '3rem';
+                    spinner.style.height = '3rem';
+                    
+                    loadingOverlay.appendChild(spinner);
+                    document.body.appendChild(loadingOverlay);
+                }
+                loadingOverlay.style.display = 'flex';
+            } else {
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                if (loadingOverlay) {
+                    loadingOverlay.style.display = 'none';
+                }
+            }
+        }
+    </script>
+</body>
+</html>

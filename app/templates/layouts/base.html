@@ -2,112 +2,158 @@
 <html lang="pt-br">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{{ title or "Portal" }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>{{ title or "Portal" }} | Care Enfermagem</title>
+    
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#007bff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/icon-192.png') }}">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 </head>
 
 <body class="app">
-    <aside class="sidebar">
-        <div class="brand">
-            <div class="brand-title">Portal Bent</div>
-            <div class="brand-sub">Care Enfermagem</div>
-        </div>
-
-        <nav class="nav">
-  <a class="nav-item" href="{{ url_for('main.dashboard') }}">
-    <i data-lucide="layout-dashboard"></i><span>Painel</span>
-  </a>
-
-  <a class="nav-item" href="{{ url_for('nursing_ui.daily_page') }}">
-    <i data-lucide="calendar-days"></i><span>Escala Dia</span>
-  </a>
-
-  {% if current_user.role in ["manager","admin"] %}
-    <a class="nav-item" href="{{ url_for('nursing_ui.year_view') }}">
-      <i data-lucide="calendar-range"></i><span>Escala Mensal</span>
-    </a>
-  {% endif %}
-
-  <a class="nav-item" href="{{ url_for('scales.index') }}">
-    <i data-lucide="clipboard-list"></i><span>Escalas</span>
-  </a>
-
-  <a class="nav-item" href="{{ url_for('docs.index') }}">
-    <i data-lucide="file-text"></i><span>Documentos</span>
-  </a>
-
-  <a class="nav-item" href="{{ url_for('indicators.index') }}">
-    <i data-lucide="bar-chart-3"></i><span>Indicadores</span>
-  </a>
-
-  <a class="nav-item" href="{{ url_for('swaps.index') }}">
-    <i data-lucide="repeat-2"></i><span>Trocas</span>
-  </a>
-
-  {% if current_user.role in ["manager","admin"] %}
-    <div class="nav-section">Configurações</div>
-
-    <a class="nav-item" href="{{ url_for('settings.users') }}">
-      <i data-lucide="users"></i><span>Colaboradores</span>
-    </a>
-
-    <a class="nav-item" href="{{ url_for('settings.sectors') }}">
-      <i data-lucide="building-2"></i><span>Setores</span>
-    </a>
-
-    <a class="nav-item" href="{{ url_for('auth.users_pending') }}">
-      <i data-lucide="user-check"></i><span>Aprovar acessos</span>
-    </a>
-
-    <a class="nav-item" href="{{ url_for('announcements.index') }}">
-      <i data-lucide="megaphone"></i><span>Avisos</span>
-    </a>
-  {% endif %}
-</nav>
-
-<div class="sidebar-footer">
-  <a class="nav-item danger" href="{{ url_for('auth.logout') }}">
-    <i data-lucide="log-out"></i><span>Sair</span>
-  </a>
-</div>
-
-
-        <div class="sidebar-footer">
-            <a class="nav-item danger" href="{{ url_for('auth.logout') }}">
-                <i data-lucide="log-out"></i><span>Sair</span>
-            </a>
-        </div>
-    </aside>
-
-    <main class="main">
-        <header class="topbar">
-            <div class="topbar-title">{{ title or "" }}</div>
-            <div class="topbar-right">
-                <span class="pill">{{ current_user.setor or "—" }}</span>
-                <span class="pill">{{ current_user.turno or "—" }}</span>
-            </div>
-        </header>
-
-        <div class="content">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                <div class="flashes">
-                    {% for cat,msg in messages %}
-                    <div class="flash {{cat}}">{{ msg }}</div>
-                    {% endfor %}
+    {% if not current_user.is_authenticated %}
+        <div class="bg-animated"></div>
+        <div class="bg-dots"></div>
+        <div class="auth-page">
+            <div class="auth-box">
+                <div class="auth-header">
+                    <div class="logo">
+                        <div class="logo-icon">C</div>
+                        <h2>Care Enfermagem</h2>
+                    </div>
+                    <p>Portal de Gestão de Escalas</p>
                 </div>
-                {% endif %}
-            {% endwith %}
 
-            {% block content %}{% endblock %}
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for cat, msg in messages %}
+                            <div class="flash {{ cat }}">{{ msg }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                {% block content_auth %}{% endblock %}
+            </div>
         </div>
-    </main>
+    {% else %}
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-title">Portal Bent</div>
+                <div class="brand-sub">Care Enfermagem</div>
+            </div>
 
-    <!-- Lucide Icons -->
+            <nav class="nav">
+                <a class="nav-item {% if request.endpoint == 'dashboard.index' %}active{% endif %}"
+                   href="{{ url_for('dashboard.index') }}">
+                    <i data-lucide="layout-dashboard"></i><span>Painel</span>
+                </a>
+
+                <a class="nav-item {% if request.endpoint == 'nursing_ui.daily' %}active{% endif %}"
+                   href="{{ url_for('nursing_ui.daily') }}">
+                    <i data-lucide="calendar-days"></i><span>Escala Dia</span>
+                </a>
+
+                <a class="nav-item {% if 'nursing_ui' in request.blueprint and request.endpoint != 'nursing_ui.daily' %}active{% endif %}"
+                   href="{{ url_for('nursing_ui.year_view') }}">
+                    <i data-lucide="calendar-range"></i><span>Escala Mensal</span>
+                </a>
+
+                <a class="nav-item {% if 'medical_certificates' in request.blueprint %}active{% endif %}"
+                   href="{{ url_for('medical_certificates.index') }}">
+                    <i data-lucide="heart-pulse"></i><span>Atestado Médico</span>
+                </a>
+
+                <!-- Link para Indicadores - CORRIGIDO -->
+                {% if current_user.role in ["manager","admin","nurse"] %}
+                <a class="nav-item {% if 'indicators' in request.blueprint %}active{% endif %}"
+                   href="{{ url_for('indicators.indicators_dashboard') }}">
+                    <i data-lucide="bar-chart-3"></i><span>Indicadores</span>
+                </a>
+                {% endif %}
+
+                <a class="nav-item {% if 'swaps' in request.blueprint %}active{% endif %}"
+                   href="{{ url_for('swaps.index') }}">
+                    <i data-lucide="repeat-2"></i><span>Trocas</span>
+                </a>
+
+                {% if current_user.role in ["manager","admin"] %}
+                    <div class="nav-section">Gestão</div>
+                    
+                    <a class="nav-item {% if 'settings' in request.blueprint %}active{% endif %}"
+                       href="{{ url_for('settings.users') }}">
+                        <i data-lucide="users"></i><span>Colaboradores</span>
+                    </a>
+
+                    <a class="nav-item {% if 'announcements' in request.blueprint %}active{% endif %}"
+                       href="{{ url_for('announcements.index') }}">
+                        <i data-lucide="megaphone"></i><span>Avisos</span>
+                    </a>
+                {% endif %}
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="me">
+                    <div class="me-name">{{ current_user.nome }}</div>
+                    <div class="me-sub">{{ current_user.role|capitalize }}</div>
+                </div>
+                <a class="nav-item danger" href="{{ url_for('auth.logout') }}">
+                    <i data-lucide="log-out"></i><span>Sair</span>
+                </a>
+            </div>
+        </aside>
+
+        <div class="main">
+            <header class="topbar">
+                <div class="topbar-title">{{ title or "Painel" }}</div>
+                <div class="topbar-right">
+                    <span class="pill">{{ current_user.sector.name if current_user.sector else "Sem Setor" }}</span>
+                    <span class="pill">{{ current_user.turno or "—" }}</span>
+                </div>
+            </header>
+
+            <div class="content">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="flashes">
+                            {% for cat, msg in messages %}
+                                <div class="flash {{ cat }}">{{ msg }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    {% endif %}
+
     <script src="https://unpkg.com/lucide@latest"></script>
     <script>
         lucide.createIcons();
+
+        // Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register("/static/js/service-worker.js").catch(() => {});
+            });
+        }
+
+        // Loading effect
+        document.addEventListener('DOMContentLoaded', function() {
+            const forms = document.querySelectorAll('form');
+            forms.forEach(form => {
+                form.addEventListener('submit', function() {
+                    const btn = this.querySelector('button[type="submit"]');
+                    if (btn) btn.classList.add('loading');
+                });
+            });
+        });
     </script>
 </body>
 </html>

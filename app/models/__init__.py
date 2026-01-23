@@ -1,12 +1,7 @@
 ﻿from .user import User
-from .document import Document, DocumentVersion, DocumentRead
-from .scale import Scale
-
-from .swap import ShiftSwap, SwapEvent
-from .sick_note import SickNote
-from .announcement import Announcement
-
 from .sector import Sector
+
+# Módulos de Enfermagem (Escalas Mensais)
 from .nursing_schedule import (
     NursingMonthlySchedule,
     NursingMonthlyMember,
@@ -14,36 +9,43 @@ from .nursing_schedule import (
     NursingDailyOverride,
 )
 
+# Módulo de Trocas
+from .swap import ShiftSwap
+
+# Módulo de Comunicados
+try:
+    from .announcement import Announcement, AnnouncementRead
+except ImportError:
+    pass
+
+# ✅ CORREÇÃO: Módulo de Documentos (POPs, Protocolos e Manuais)
+# O arquivo físico deve se chamar 'document.py'
+try:
+    from .document import Document, DocumentVersion, DocumentRead
+except ImportError:
+    # Caso o arquivo ainda não exista ou tenha outro nome
+    pass
+
+# ✅ CORREÇÃO: Módulo de Escalas e Atestados
+try:
+    from .scale import Scale
+    from .sick_note import SickNote
+except ImportError:
+    pass
+
 __all__ = [
-    # Auth / UsuÃ¡rios / Config
     "User",
     "Sector",
-
-    # Documentos
-    "Document",
-    "DocumentVersion",
-    "DocumentRead",
-
-    # Escalas (upload outras especialidades / PDFs)
-    "Scale",
-
-    # Escala de Enfermagem no sistema
     "NursingMonthlySchedule",
     "NursingMonthlyMember",
     "NursingMonthlyCell",
     "NursingDailyOverride",
-
-    # Trocas
     "ShiftSwap",
-    "SwapEvent",
-
-    # Atestados
-    "SickNote",
-
-    # Comunicados
     "Announcement",
+    "AnnouncementRead",
+    "Document",
+    "DocumentVersion",
+    "DocumentRead",
+    "Scale",
+    "SickNote"
 ]
-
-
-
-

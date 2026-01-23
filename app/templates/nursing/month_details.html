@@ -1,5 +1,6 @@
 {% extends "layouts/base.html" %}
 {% block content %}
+
 <div class="content">
   <div class="page-head">
     <div class="page-head-left">
@@ -9,30 +10,38 @@
     </div>
 
     <div class="head-actions">
-      <button class="btn primary" type="button" onclick="openCreateModal()">＋ Criar escala</button>
+      <button class="btn primary" type="button" onclick="openCreateModal()">
+        ＋ Criar escala
+      </button>
     </div>
   </div>
 
   <div class="sector-grid">
-    {% for scale in existing_scales %}
-      <a class="sector-card"
-         href="{{ url_for('nursing_ui.editor_view', ano=ano, mes=mes, sector_id=scale.sector_id) }}">
-        <div class="sector-card-top">
-          <div class="sector-icon">🏥</div>
-          <div>
-            <h3>{{ scale.sector_name }}</h3>
-            <div class="sector-meta">
-              <span class="status-dot {{ 'active' if scale.is_published else 'inactive' }}"></span>
-              {{ "Publicada" if scale.is_published else "Rascunho" }}
+    {% if existing_scales and existing_scales|length > 0 %}
+      {% for scale in existing_scales %}
+        <a class="sector-card"
+           href="{{ url_for('nursing_ui.editor_view', ano=ano, mes=mes, sector_id=scale.sector_id) }}">
+          <div class="sector-card-top">
+            <div class="sector-icon">🏥</div>
+            <div>
+              <h3>{{ scale.sector_name }}</h3>
+              <div class="sector-meta">
+                <span class="status-dot {{ 'active' if scale.is_published else 'inactive' }}"></span>
+                {{ "Publicada" if scale.is_published else "Rascunho" }}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="sector-bottom">
-          👥 {{ scale.prof_count }} colaboradores
-        </div>
-      </a>
-    {% endfor %}
+          <div class="sector-bottom">
+            👥 {{ scale.prof_count }} colaboradores
+          </div>
+        </a>
+      {% endfor %}
+    {% else %}
+      <div class="muted" style="padding: 10px 2px;">
+        Nenhuma escala criada para este mês ainda.
+      </div>
+    {% endif %}
 
     <button class="sector-card add-new" type="button" onclick="openCreateModal()">
       <div class="add-icon">＋</div>
@@ -41,18 +50,25 @@
   </div>
 </div>
 
-<div id="createModal" class="modal-overlay" style="display:none;">
-  <form class="modal-box" action="{{ url_for('nursing_ui.create_scale_action') }}" method="POST">
+<!-- MODAL -->
+<div id="createModal" class="modal-overlay" style="display:none;" aria-hidden="true" role="dialog" aria-modal="true">
+  <form class="modal-box"
+        action="{{ url_for('nursing_ui.create_scale_action') }}"
+        method="POST"
+        autocomplete="off"
+        onsubmit="lockSubmit(this)">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-    <h3>Nova escala • {{ month_label }}</h3>
-
     <input type="hidden" name="ano" value="{{ ano }}">
     <input type="hidden" name="mes" value="{{ mes }}">
 
+    <div class="modal-head">
+      <h3 style="margin:0;">Nova escala • {{ month_label }}</h3>
+      <button type="button" class="icon-btn" onclick="closeCreateModal()" aria-label="Fechar">✕</button>
+    </div>
+
     <div class="form-group">
-      <label>Selecione o setor</label>
-      <select name="sector_id" class="input" required>
+      <label for="sector_id">Selecione o setor</label>
+      <select id="sector_id" name="sector_id" class="input" required>
         <option value="" disabled selected>-- Escolha um setor --</option>
         {% for s in available_sectors %}
           <option value="{{ s.id }}">{{ s.name }}</option>
@@ -68,9 +84,47 @@
   </form>
 </div>
 
-
 <script>
-  function openCreateModal(){ document.getElementById('createModal').style.display='flex'; }
-  function closeCreateModal(){ document.getElementById('createModal').style.display='none'; }
+  function openCreateModal(){
+    const overlay = document.getElementById('createModal');
+    overlay.style.display = 'flex';
+    overlay.setAttribute('aria-hidden', 'false');
+
+    // foca o select
+    const sel = document.getElementById('sector_id');
+    if (sel) setTimeout(() => sel.focus(), 50);
+  }
+
+  function closeCreateModal(){
+    const overlay = document.getElementById('createModal');
+    overlay.style.display = 'none';
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+
+  // fecha ao clicar fora da caixa
+  document.addEventListener('click', function(ev){
+    const overlay = document.getElementById('createModal');
+    if (!overlay || overlay.style.display !== 'flex') return;
+
+    if (ev.target === overlay) closeCreateModal();
+  });
+
+  // fecha no ESC
+  document.addEventListener('keydown', function(ev){
+    if (ev.key === 'Escape') {
+      const overlay = document.getElementById('createModal');
+      if (overlay && overlay.style.display === 'flex') closeCreateModal();
+    }
+  });
+
+  // trava duplo submit
+  function lockSubmit(form){
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Criando...';
+    }
+  }
 </script>
+
 {% endblock %}

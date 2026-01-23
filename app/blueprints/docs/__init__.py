@@ -1,1 +1,1 @@
-﻿
+from .routes import docs_bp

@@ -1,49 +1,62 @@
-﻿from flask import Blueprint, render_template, request, redirect, url_for, flash
+﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 
 from ...extensions import db
-from ...utils.security import require_roles, require_active
-from ...models.announcement import Announcement
-from ...models.announcement_read import AnnouncementRead
-from ...models.user import User
+# ✅ IMPORTANTE: Importando tudo de app.models (arquivo unificado)
+from ...models import Announcement, AnnouncementRead, User, Sector
 
 bp = Blueprint("announcements", __name__, url_prefix="/announcements")
 
+# Função auxiliar para verificar permissão
+def is_manager():
+    return getattr(current_user, 'role', '') in ["manager", "admin"]
+
 @bp.get("/")
 @login_required
-@require_active
 def index():
     tipo = request.args.get("tipo")
     setor = request.args.get("setor")
     
     query = Announcement.query
+    
+    # Se não for gerente, só vê os ativos
+    if not is_manager():
+        query = query.filter_by(active=True)
+
     if tipo:
         query = query.filter_by(tipo=tipo)
     if setor:
         query = query.filter_by(setor=setor)
 
-    announcements = query.order_by(Announcement.created_at.desc()).all()
-    # Lista de setores para o filtro (pode vir do banco se preferir)
-    sectors = [{"name": "UTI Adulto"}, {"name": "Hospital"}] 
+    # Ordena por fixados primeiro, depois por data
+    announcements = query.order_by(Announcement.is_pinned.desc(), Announcement.created_at.desc()).all()
+    
+    # Busca setores para o filtro
+    sectors = Sector.query.filter_by(active=True).order_by(Sector.name.asc()).all()
     
     return render_template("announcements/index.html", 
-                           title="Avisos", 
+                           title="Comunicados", 
                            announcements=announcements, 
                            sectors=sectors)
 
 @bp.get("/new")
 @login_required
-@require_roles("manager", "admin")
 def new():
-    return render_template("announcements/new.html", title="Novo aviso")
+    if not is_manager():
+        flash("Acesso restrito.", "danger")
+        return redirect(url_for('announcements.index'))
+    return render_template("announcements/new.html", title="Novo Comunicado")
 
 @bp.post("/new")
 @login_required
-@require_roles("manager", "admin")
 def create():
+    if not is_manager():
+        return redirect(url_for('announcements.index'))
+
     tipo = (request.form.get("tipo") or "info").strip()
     title = (request.form.get("title") or "").strip()
-    body = (request.form.get("body") or "").strip()
+    # ✅ Corrigido: usando 'content' em vez de 'body'
+    content = (request.form.get("content") or "").strip() 
     setor = (request.form.get("setor") or "").strip() or None
     is_pinned = (request.form.get("is_pinned") == "on")
 
@@ -54,16 +67,17 @@ def create():
     a = Announcement(
         tipo=tipo,
         title=title,
-        body=body,
+        content=content,
         setor=setor,
         is_pinned=is_pinned,
         created_by_id=current_user.id,
+        active=True
     )
 
     try:
         db.session.add(a)
         db.session.commit()
-        flash("Aviso publicado.", "success")
+        flash("Comunicado publicado.", "success")
     except Exception as e:
         db.session.rollback()
         flash(f"Erro ao salvar: {str(e)}", "danger")
@@ -72,68 +86,88 @@ def create():
 
 @bp.get("/<int:id>")
 @login_required
-@require_active
 def detail(id):
+    # Rota de detalhe (opcional, já que o index mostra tudo)
     a = Announcement.query.get_or_404(id)
-    # Lógica de marcação de leitura
-    exists = AnnouncementRead.query.filter_by(
-        announcement_id=a.id, user_id=current_user.id
-    ).first()
-    if not exists:
+    
+    # Se não for gerente e estiver inativo, bloqueia
+    if not a.active and not is_manager():
+        flash("Este comunicado não está disponível.", "warning")
+        return redirect(url_for('announcements.index'))
+
+    # Marca leitura ao abrir detalhe
+    if not a.is_read_by(current_user):
         db.session.add(AnnouncementRead(announcement_id=a.id, user_id=current_user.id))
         db.session.commit()
 
-    unread_users, read_users = [], []
-    if current_user.role in ["manager", "admin"]:
-        reads = AnnouncementRead.query.filter_by(announcement_id=a.id).all()
-        read_map = {r.user_id: r.read_at for r in reads}
-        users_q = User.query.filter_by(status="active").all()
-        for u in users_q:
-            if u.id in read_map:
-                read_users.append((u, read_map[u.id]))
-            else:
-                unread_users.append(u)
-
-    return render_template("announcements/detail.html", title="Aviso", a=a, 
-                           read_users=read_users, unread_users=unread_users)
+    return render_template("announcements/detail.html", title=a.title, a=a)
 
 @bp.get("/<int:id>/edit")
 @login_required
-@require_roles("manager", "admin")
 def edit(id):
+    if not is_manager():
+        return redirect(url_for('announcements.index'))
     a = Announcement.query.get_or_404(id)
-    return render_template("announcements/new.html", title="Editar Aviso", a=a)
+    return render_template("announcements/new.html", title="Editar Comunicado", a=a)
 
 @bp.post("/<int:id>/edit")
 @login_required
-@require_roles("manager", "admin")
 def update(id):
+    if not is_manager():
+        return redirect(url_for('announcements.index'))
+        
     a = Announcement.query.get_or_404(id)
     a.title = request.form.get("title")
-    a.body = request.form.get("body")
+    # ✅ Corrigido: usando 'content'
+    a.content = request.form.get("content")
     a.tipo = request.form.get("tipo")
     a.setor = request.form.get("setor")
+    a.is_pinned = (request.form.get("is_pinned") == "on")
+    
     db.session.commit()
-    flash("Aviso atualizado!", "success")
+    flash("Comunicado atualizado!", "success")
     return redirect(url_for("announcements.index"))
 
 @bp.post("/<int:id>/delete")
 @login_required
-@require_roles("manager", "admin")
 def delete(id):
+    if not is_manager():
+        return redirect(url_for('announcements.index'))
+        
     a = Announcement.query.get_or_404(id)
     db.session.delete(a)
     db.session.commit()
-    flash("Aviso excluído!", "success")
+    flash("Comunicado excluído.", "success")
     return redirect(url_for("announcements.index"))
 
 @bp.post("/<int:id>/toggle")
 @login_required
-@require_roles("manager", "admin")
 def toggle(id):
+    if not is_manager():
+        return redirect(url_for('announcements.index'))
+        
     a = Announcement.query.get_or_404(id)
     a.active = not a.active
     db.session.commit()
+    
     status = "ativado" if a.active else "desativado"
-    flash(f"Aviso {status}!", "info")
+    flash(f"Comunicado {status}!", "info")
     return redirect(url_for("announcements.index"))
+
+# ✅ ROTA AJAX: Marcar como lido
+@bp.route('/<int:id>/mark_read', methods=['POST'])
+@login_required
+def mark_read(id):
+    announcement = Announcement.query.get_or_404(id)
+    
+    # Verifica se já leu para não duplicar (usa o método do model)
+    if not announcement.is_read_by(current_user):
+        new_read = AnnouncementRead(user_id=current_user.id, announcement_id=announcement.id)
+        db.session.add(new_read)
+        db.session.commit()
+        
+    # Retorna JSON para o frontend atualizar o contador
+    return jsonify({
+        'ok': True, 
+        'count': announcement.reads.count()
+    })

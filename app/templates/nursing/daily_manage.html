@@ -1,0 +1,61 @@
+{% extends "layouts/base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="glass-header mb-4 p-3" style="background: #1a1d24; border-radius: 12px; border-left: 5px solid #ffc107;">
+        <h2 class="mb-0">Gerenciar Presença Real</h2>
+        <p class="text-muted mb-0">
+            Setor: <strong>{{ sector.name }}</strong> | 
+            Data: <strong>{{ date.strftime('%d/%m/%Y') }}</strong> | 
+            Turno: <strong>{{ turno }}</strong>
+        </p>
+    </div>
+
+    <div class="card bg-dark border-secondary shadow">
+        <div class="card-body">
+            <form method="POST" action="">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover">
+                        <thead>
+                            <tr>
+                                <th>Profissional</th>
+                                <th>Cargo</th>
+                                <th width="250">Status de Presença</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in planned_staff %}
+                            <tr>
+                                <td>
+                                    <div class="fw-bold">{{ p.name }}</div>
+                                    <small class="text-muted">ID: {{ p.user_id }}</small>
+                                </td>
+                                <td><span class="text-info">{{ p.cargo }}</span></td>
+                                <td>
+                                    <select name="status_{{ p.user_id }}" class="form-select bg-dark text-white border-secondary">
+                                        <option value="AGUARDANDO" {% if p.real_status == 'AGUARDANDO' %}selected{% endif %}>⏳ Aguardando...</option>
+                                        <option value="P" {% if p.real_status == 'P' %}selected{% endif %}>✅ Presente</option>
+                                        <option value="F" {% if p.real_status == 'F' %}selected{% endif %}>❌ Falta</option>
+                                        <option value="AT" {% if p.real_status == 'AT' %}selected{% endif %}>📄 Atestado</option>
+                                        <option value="EX" {% if p.real_status == 'EX' %}selected{% endif %}>🔄 Troca</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-success">
+                        <i data-lucide="save"></i> Salvar Fechamento
+                    </button>
+                    <a href="{{ url_for('nursing_ui.daily') }}" class="btn btn-outline-light">
+                        Cancelar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

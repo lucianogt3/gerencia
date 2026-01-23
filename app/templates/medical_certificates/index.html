@@ -1,0 +1,609 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+<div class="dash">
+
+  <div class="page-head">
+    <div class="page-head-left">
+      <h1>🩺 Atestados Médicos</h1>
+      <div class="muted">
+        {% if is_manager %}
+          Aprovação e lançamentos manuais de atestados da equipe
+        {% else %}
+          Seus atestados enviados para aprovação
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="page-head-right">
+      <span class="pill">Setor: {{ current_user.setor or 'Não definido' }}</span>
+      <span class="pill">Turno: {{ current_user.turno or 'Não definido' }}</span>
+      <a class="btn btn-primary" href="{{ url_for('medical_certificates.new') }}">
+        <i data-lucide="plus" style="width: 14px; height: 14px;" class="me-1"></i> Novo Atestado
+      </a>
+    </div>
+  </div>
+
+  <!-- Cards de Estatísticas na Horizontal -->
+  <div class="kpi-grid">
+    <div class="kpi-card warning">
+      <div class="kpi-icon">⏳</div>
+      <div class="kpi-content">
+        <div class="kpi-value">{{ notes|selectattr('status','equalto','pending')|list|length }}</div>
+        <div class="kpi-label">PENDENTES</div>
+      </div>
+    </div>
+
+    <div class="kpi-card success">
+      <div class="kpi-icon">✅</div>
+      <div class="kpi-content">
+        <div class="kpi-value">{{ notes|selectattr('status','equalto','approved')|list|length }}</div>
+        <div class="kpi-label">APROVADOS</div>
+      </div>
+    </div>
+
+    <div class="kpi-card danger">
+      <div class="kpi-icon">❌</div>
+      <div class="kpi-content">
+        <div class="kpi-value">{{ notes|selectattr('status','equalto','rejected')|list|length }}</div>
+        <div class="kpi-label">REPROVADOS</div>
+      </div>
+    </div>
+
+    <div class="kpi-card info">
+      <div class="kpi-icon">📋</div>
+      <div class="kpi-content">
+        <div class="kpi-value">{{ notes|length }}</div>
+        <div class="kpi-label">TOTAL</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barra de Filtros -->
+  <div class="toolbar">
+    <form method="get" class="filter-group">
+      <div class="filter-item">
+        <label class="text-white-80 small">Pesquisar:</label>
+        <input type="text" class="input filter-input" name="q" value="{{ request.args.get('q','') }}"
+               placeholder="Matrícula ou nome...">
+      </div>
+
+      <div class="filter-item">
+        <label class="text-white-80 small">Status:</label>
+        {% set st = request.args.get('status','') %}
+        <select class="input select-filter" name="status">
+          <option value="" {% if st=='' %}selected{% endif %}>Todos</option>
+          <option value="pending" {% if st=='pending' %}selected{% endif %}>Pendentes</option>
+          <option value="approved" {% if st=='approved' %}selected{% endif %}>Aprovados</option>
+          <option value="rejected" {% if st=='rejected' %}selected{% endif %}>Reprovados</option>
+        </select>
+      </div>
+
+      <div class="filter-item">
+        <button class="btn btn-sm" type="submit">
+          <i data-lucide="filter" style="width: 14px; height: 14px;" class="me-1"></i> Filtrar
+        </button>
+      </div>
+    </form>
+    
+    <div class="muted small" style="margin-top: 10px; width: 100%;">
+      Após salvar, o registro fica travado (sem editar/apagar) e segue para aprovação. CID é opcional.
+    </div>
+  </div>
+
+  <!-- Tabela -->
+  <div class="card master-table-card">
+    <div class="table-wrap">
+      <table class="table" id="atestadosTable">
+        <thead>
+          <tr>
+            <th width="120">STATUS</th>
+            <th width="100">MATRÍCULA</th>
+            <th>NOME</th>
+            <th width="120">SETOR</th>
+            <th width="100">DATA</th>
+            <th width="80">DIAS</th>
+            <th width="100">CID</th>
+            <th width="100">ANEXO</th>
+            <th width="100">AÇÃO</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for n in notes %}
+          <tr class="row-item">
+            <td>
+              {% if n.status == 'pending' %}
+                <span class="badge warning">⏳ Pendente</span>
+              {% elif n.status == 'approved' %}
+                <span class="badge success">✅ Aprovado</span>
+              {% else %}
+                <span class="badge danger">❌ Reprovado</span>
+              {% endif %}
+            </td>
+
+            <td>
+              <span class="text-mono">{{ n.matricula }}</span>
+            </td>
+            
+            <td>
+              <div class="fw-bold text-white">{{ n.nome or '—' }}</div>
+            </td>
+            
+            <td>
+              <span class="tag-sector">{{ n.setor or '—' }}</span>
+            </td>
+            
+            <td>
+              <div class="text-white">{{ n.data_atestado.strftime('%d/%m/%Y') if n.data_atestado else '—' }}</div>
+            </td>
+            
+            <td>
+              <span class="badge info">{{ n.dias or 0 }}</span>
+            </td>
+            
+            <td>
+              <span class="text-muted">{{ n.cid or '—' }}</span>
+            </td>
+
+            <td>
+              {% if n.filename %}
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('medical_certificates.download', note_id=n.id) }}">
+                  <i data-lucide="paperclip" style="width: 12px; height: 12px;"></i> Baixar
+                </a>
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+
+            <td>
+              {% if is_manager and n.status == 'pending' %}
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('medical_certificates.review', note_id=n.id) }}">
+                  <i data-lucide="eye" style="width: 12px; height: 12px;"></i> Revisar
+                </a>
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+
+          {% if notes|length == 0 %}
+          <tr>
+            <td colspan="9" class="text-center py-4">
+              <div class="text-muted mb-2">
+                <i data-lucide="file-text" style="width: 48px; height: 48px;"></i>
+              </div>
+              <div class="text-white">Nenhum atestado cadastrado.</div>
+            </td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<style>
+/* Layout */
+.dash { 
+    padding: 20px; 
+    max-width: 1400px; 
+    margin: 0 auto; 
+}
+
+.page-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.page-head-left h1 {
+    color: #fff;
+    font-size: 1.8rem;
+    margin: 0 0 5px 0;
+}
+
+.page-head-left .muted {
+    color: #888;
+    font-size: 0.9rem;
+}
+
+.page-head-right {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.pill {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ccc;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* KPIs */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.kpi-card {
+    background: #1e1e1e;
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid #333;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    transition: all 0.2s;
+    min-height: 100px;
+}
+
+.kpi-card.warning { border-bottom: 3px solid #f59e0b; }
+.kpi-card.success { border-bottom: 3px solid #10b981; }
+.kpi-card.danger { border-bottom: 3px solid #ef4444; }
+.kpi-card.info { border-bottom: 3px solid #3b82f6; }
+
+.kpi-card:hover {
+    transform: translateY(-3px);
+    background: #252525;
+}
+
+.kpi-icon {
+    font-size: 2rem;
+    background: rgba(255,255,255,0.05);
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+.kpi-content {
+    flex: 1;
+}
+
+.kpi-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #fff;
+    line-height: 1;
+    margin-bottom: 5px;
+}
+
+.kpi-label {
+    font-size: 0.85rem;
+    color: #888;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Toolbar */
+.toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 25px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    background: #1a1a1a;
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid #333;
+}
+
+.filter-group {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.filter-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.filter-input, .select-filter {
+    padding: 8px 12px;
+    background: #111;
+    border: 1px solid #444;
+    color: white;
+    border-radius: 6px;
+    outline: none;
+    transition: border 0.2s;
+    font-size: 0.9rem;
+}
+
+.filter-input:focus, .select-filter:focus {
+    border-color: #3b82f6;
+}
+
+/* Tabela */
+.master-table-card {
+    margin-top: 20px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #333;
+    background: #1a1a1a;
+}
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 1000px;
+}
+
+.table th {
+    background: #222;
+    color: #aaa;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    padding: 15px;
+    text-align: left;
+    border-bottom: 1px solid #333;
+}
+
+.table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #222;
+    vertical-align: middle;
+}
+
+.row-item:hover {
+    background: rgba(255,255,255,0.03);
+}
+
+/* Badges */
+.badge {
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-block;
+}
+
+.badge.warning {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fcd34d;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge.success {
+    background: rgba(16, 185, 129, 0.15);
+    color: #6ee7b7;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge.danger {
+    background: rgba(239, 68, 68, 0.15);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.badge.info {
+    background: rgba(59, 130, 246, 0.15);
+    color: #93c5fd;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* Elementos */
+.tag-sector {
+    background: #333;
+    color: #ccc;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    border: 1px solid #444;
+}
+
+.text-mono {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    color: #ccc;
+}
+
+/* Botões */
+.btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: #2a2a2a;
+    color: #ccc;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn:hover {
+    background: #333;
+    color: #fff;
+    border-color: #444;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+}
+
+.btn-primary:hover {
+    background: #2563eb;
+    border-color: #2563eb;
+}
+
+.btn-secondary {
+    background: #6b7280;
+    color: white;
+    border-color: #6b7280;
+}
+
+.btn-secondary:hover {
+    background: #4b5563;
+    border-color: #4b5563;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+}
+
+.btn-outline-primary {
+    background: transparent;
+    color: #3b82f6;
+    border-color: #3b82f6;
+}
+
+.btn-outline-primary:hover {
+    background: #3b82f6;
+    color: white;
+}
+
+.btn-outline-secondary {
+    background: transparent;
+    color: #6b7280;
+    border-color: #6b7280;
+}
+
+.btn-outline-secondary:hover {
+    background: #6b7280;
+    color: white;
+}
+
+/* Utilitários */
+.muted {
+    color: #888;
+}
+
+.text-white {
+    color: #fff;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.fw-bold {
+    font-weight: bold;
+}
+
+.small {
+    font-size: 0.85rem;
+}
+
+/* Responsividade */
+@media (max-width: 1200px) {
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .page-head {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .page-head-right {
+        width: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .kpi-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .table {
+        min-width: auto;
+    }
+    
+    .table th, .table td {
+        padding: 10px 8px;
+        font-size: 0.85rem;
+    }
+    
+    .table th:nth-child(4),
+    .table td:nth-child(4),
+    .table th:nth-child(5),
+    .table td:nth-child(5),
+    .table th:nth-child(6),
+    .table td:nth-child(6),
+    .table th:nth-child(7),
+    .table td:nth-child(7) {
+        display: none;
+    }
+}
+
+/* Scrollbar personalizada */
+.table-wrap::-webkit-scrollbar {
+    height: 6px;
+}
+
+.table-wrap::-webkit-scrollbar-track {
+    background: #1a1a1a;
+    border-radius: 3px;
+}
+
+.table-wrap::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 3px;
+}
+
+.table-wrap::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+</style>
+
+<script>
+// Inicializar ícones Lucide
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+});
+</script>
+{% endblock %}

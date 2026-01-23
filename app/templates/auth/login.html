@@ -1,17 +1,801 @@
-﻿{% extends "layouts/base.html" %}
-{% block content %}
-  <h1>Entrar</h1>
-  <form method="post">
-    {{ form.csrf_token }}
-    <label>Matrícula ou E-mail</label>
-    {{ form.matricula_or_email(class_="input") }}
-    <label>Senha</label>
-    {{ form.password(class_="input") }}
-    <button class="btn" type="submit">{{ form.submit.label.text }}</button>
-  </form>
-  <p class="muted">Não tem acesso? <a href="{{ url_for('auth.register') }}">Solicitar cadastro</a></p>
-{% endblock %}
+﻿<!doctype html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title or "Portal" }} | Care Enfermagem</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+    <style>
+        /* ================================================
+           RESET E CONFIGURAÇÕES GERAIS
+           ================================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            overflow: hidden;
+        }
 
+        /* ================================================
+           LAYOUT QUANDO NÃO AUTENTICADO
+           ================================================ */
+        body:not(.logged-in) {
+            background: linear-gradient(135deg, 
+                #0f172a 0%, 
+                #1e293b 25%, 
+                #334155 50%, 
+                #475569 75%, 
+                #64748b 100%
+            );
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+        }
 
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
 
+        /* ================================================
+           BACKGROUND ANIMADO
+           ================================================ */
+        .bg-animated {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .floating-element {
+            position: absolute;
+            border-radius: 50%;
+            background: linear-gradient(135deg, 
+                rgba(59, 130, 246, 0.15), 
+                rgba(168, 85, 247, 0.15)
+            );
+            filter: blur(40px);
+            animation: float 20s infinite ease-in-out;
+        }
+
+        .floating-element:nth-child(1) {
+            width: 500px;
+            height: 500px;
+            top: -200px;
+            left: -200px;
+            animation-delay: 0s;
+        }
+
+        .floating-element:nth-child(2) {
+            width: 400px;
+            height: 400px;
+            bottom: -150px;
+            right: -150px;
+            animation-delay: -5s;
+            background: linear-gradient(135deg, 
+                rgba(34, 197, 94, 0.15), 
+                rgba(59, 130, 246, 0.15)
+            );
+        }
+
+        .floating-element:nth-child(3) {
+            width: 300px;
+            height: 300px;
+            top: 50%;
+            right: 20%;
+            animation-delay: -10s;
+            background: linear-gradient(135deg, 
+                rgba(249, 115, 22, 0.15), 
+                rgba(168, 85, 247, 0.15)
+            );
+        }
+
+        @keyframes float {
+            0%, 100% { 
+                transform: translate(0, 0) rotate(0deg); 
+            }
+            25% { 
+                transform: translate(50px, 50px) rotate(90deg); 
+            }
+            50% { 
+                transform: translate(0, 100px) rotate(180deg); 
+            }
+            75% { 
+                transform: translate(-50px, 50px) rotate(270deg); 
+            }
+        }
+
+        /* ================================================
+           PARTICULAS FLUTUANTES
+           ================================================ */
+        .particles-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            animation: particleFloat 8s infinite linear;
+        }
+
+        @keyframes particleFloat {
+            0% {
+                transform: translateY(100vh) translateX(0) rotate(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100px) translateX(100px) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        /* ================================================
+           CONTAINER DE LOGIN CENTRALIZADO
+           ================================================ */
+        .login-container {
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 2;
+        }
+
+        /* ================================================
+           CARD DE LOGIN
+           ================================================ */
+        .login-card {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 50px 40px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 
+                0 25px 50px -12px rgba(0, 0, 0, 0.5),
+                0 0 0 1px rgba(255, 255, 255, 0.05),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            animation: slideUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-origin: center;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        /* ================================================
+           LOGO E HEADER
+           ================================================ */
+        .logo-section {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            color: white;
+            font-size: 28px;
+            font-weight: 800;
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3);
+            }
+            50% {
+                box-shadow: 0 10px 40px rgba(59, 130, 246, 0.5);
+            }
+        }
+
+        .logo-title {
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ffffff, #a5b4fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-subtitle {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        /* ================================================
+           FORMULÁRIO
+           ================================================ */
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.9);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-label svg {
+            width: 16px;
+            height: 16px;
+            opacity: 0.6;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 16px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: white;
+            font-size: 15px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .form-input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: rgba(59, 130, 246, 0.5);
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+
+        .form-input:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* ================================================
+           BOTÃO DE LOGIN
+           ================================================ */
+        .login-button {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, 
+                transparent, 
+                rgba(255, 255, 255, 0.2), 
+                transparent
+            );
+            transition: left 0.7s ease;
+        }
+
+        .login-button:hover::before {
+            left: 100%;
+        }
+
+        .login-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 
+                0 12px 30px rgba(59, 130, 246, 0.4),
+                0 0 0 1px rgba(255, 255, 255, 0.1);
+        }
+
+        .login-button:active {
+            transform: translateY(0);
+        }
+
+        .login-button.loading {
+            opacity: 0.8;
+            cursor: not-allowed;
+        }
+
+        /* ================================================
+           MENSAGENS FLASH
+           ================================================ */
+        .flash-messages {
+            margin-bottom: 24px;
+        }
+
+        .flash {
+            padding: 14px 18px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 12px;
+            animation: slideIn 0.5s ease;
+            border: 1px solid transparent;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .flash.error {
+            background: rgba(239, 68, 68, 0.1);
+            color: #fca5a5;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .flash.success {
+            background: rgba(34, 197, 94, 0.1);
+            color: #86efac;
+            border-color: rgba(34, 197, 94, 0.3);
+        }
+
+        .flash.warning {
+            background: rgba(245, 158, 11, 0.1);
+            color: #fde68a;
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+
+        .flash.info {
+            background: rgba(59, 130, 246, 0.1);
+            color: #93c5fd;
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        /* ================================================
+           FOOTER
+           ================================================ */
+        .login-footer {
+            margin-top: 30px;
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .version-info {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.4);
+            font-weight: 500;
+        }
+
+        /* ================================================
+           RESPONSIVIDADE
+           ================================================ */
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 16px;
+            }
+            
+            .login-card {
+                padding: 40px 24px;
+                border-radius: 20px;
+            }
+            
+            .logo-icon {
+                width: 50px;
+                height: 50px;
+                font-size: 24px;
+                border-radius: 14px;
+            }
+            
+            .logo-title {
+                font-size: 24px;
+            }
+            
+            .form-input {
+                padding: 14px 16px;
+                font-size: 14px;
+            }
+            
+            .login-button {
+                padding: 16px;
+                font-size: 15px;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .login-card {
+                padding: 32px 20px;
+            }
+        }
+
+        /* ================================================
+           UTILITÁRIOS
+           ================================================ */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+
+        /* ================================================
+           LAYOUT QUANDO AUTENTICADO (mantém original)
+           ================================================ */
+        .sidebar {
+            /* Mantém estilos originais do sidebar */
+        }
+
+        .main {
+            /* Mantém estilos originais do main */
+        }
+
+        /* Classe para esconder login quando autenticado */
+        body.logged-in .login-container {
+            display: none;
+        }
+    </style>
+</head>
+
+<body class="{% if current_user.is_authenticated %}logged-in{% endif %}">
+    {% if not current_user.is_authenticated %}
+        <!-- Background animado -->
+        <div class="bg-animated">
+            <div class="floating-element"></div>
+            <div class="floating-element"></div>
+            <div class="floating-element"></div>
+        </div>
+
+        <!-- Partículas -->
+        <div class="particles-container" id="particles"></div>
+
+        <!-- Container de login centralizado -->
+        <div class="login-container">
+            <div class="login-card">
+                <!-- Logo -->
+                <div class="logo-section">
+                    <div class="logo-icon">C</div>
+                    <h1 class="logo-title">Care Enfermagem</h1>
+                    <p class="logo-subtitle">Portal de Gestão de Escalas</p>
+                </div>
+
+                <!-- Mensagens flash -->
+                <div class="flash-messages">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for cat, msg in messages %}
+                                <div class="flash {{ cat }}">{{ msg }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+                </div>
+
+                <!-- Formulário -->
+                <form method="POST" action="{{ url_for('auth.login') }}" class="login-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <div class="form-group">
+                        <label for="matricula_or_email" class="form-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                            Matrícula ou E-mail
+                        </label>
+                        <input 
+                            type="text" 
+                            id="matricula_or_email"
+                            name="matricula_or_email" 
+                            class="form-input"
+                            placeholder="Digite sua matrícula ou e-mail" 
+                            required 
+                            autofocus
+                            autocomplete="username"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password" class="form-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                            </svg>
+                            Senha
+                        </label>
+                        <input 
+                            type="password" 
+                            id="password"
+                            name="password" 
+                            class="form-input"
+                            placeholder="Digite sua senha" 
+                            required
+                            autocomplete="current-password"
+                        >
+                    </div>
+
+                    <button type="submit" class="login-button" id="loginButton">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                            <polyline points="10 17 15 12 10 7"></polyline>
+                            <line x1="15" y1="12" x2="3" y2="12"></line>
+                        </svg>
+                        <span>Entrar no Sistema</span>
+                    </button>
+                </form>
+
+                <!-- Footer -->
+                <div class="login-footer">
+                    <div class="version-info">
+                        v{{ config.get('APP_VERSION', '1.0.0') }} • Care Enfermagem © <span id="currentYear">2024</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <!-- Layout quando autenticado (mantido do original) -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-title">Portal Bent</div>
+                <div class="brand-sub">Care Enfermagem</div>
+            </div>
+
+            <nav class="nav">
+                <a class="nav-item {% if request.endpoint == 'dashboard.index' %}active{% endif %}"
+                   href="{{ url_for('dashboard.index') }}">
+                    <i data-lucide="layout-dashboard"></i><span>Painel</span>
+                </a>
+
+                <a class="nav-item {% if request.endpoint == 'nursing_ui.daily_page' %}active{% endif %}"
+                   href="{{ url_for('nursing_ui.daily_page') }}">
+                    <i data-lucide="calendar-days"></i><span>Escala Dia</span>
+                </a>
+
+                <a class="nav-item {% if request.endpoint and request.endpoint.startswith('nursing_ui.') and request.endpoint != 'nursing_ui.daily_page' %}active{% endif %}"
+                   href="{{ url_for('nursing_ui.year_view') }}">
+                    <i data-lucide="calendar-range"></i><span>Escala Mensal</span>
+                </a>
+
+                <a class="nav-item {% if request.endpoint and request.endpoint.startswith('scales') %}active{% endif %}"
+                   href="{{ url_for('scales.index') }}">
+                    <i data-lucide="clipboard-list"></i><span>Escalas</span>
+                </a>
+
+                <a class="nav-item {% if request.endpoint and request.endpoint.startswith('docs') %}active{% endif %}"
+                   href="{{ url_for('docs.index') }}">
+                    <i data-lucide="file-text"></i><span>Documentos</span>
+                </a>
+
+                <a class="nav-item {% if request.endpoint and request.endpoint.startswith('indicators') %}active{% endif %}"
+                   href="{{ url_for('indicators.indicators_dashboard') }}">
+                    <i data-lucide="bar-chart-3"></i><span>Indicadores</span>
+                </a>
+
+                <a class="nav-item {% if request.endpoint and request.endpoint.startswith('swaps') %}active{% endif %}"
+                   href="{{ url_for('swaps.index') }}">
+                    <i data-lucide="repeat-2"></i><span>Trocas</span>
+                </a>
+
+                {% if current_user.role in ["manager","admin"] %}
+                    <div class="nav-section">Gestão</div>
+
+                    <a class="nav-item {% if request.endpoint and request.endpoint.startswith('settings') %}active{% endif %}"
+                       href="{{ url_for('settings.users') }}">
+                        <i data-lucide="users"></i><span>Colaboradores</span>
+                    </a>
+
+                    <a class="nav-item {% if request.endpoint and request.endpoint.startswith('announcements') %}active{% endif %}"
+                       href="{{ url_for('announcements.index') }}">
+                        <i data-lucide="megaphone"></i><span>Avisos</span>
+                    </a>
+                {% endif %}
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="me">
+                    <div class="me-name">{{ current_user.nome }}</div>
+                    <div class="me-sub">{{ current_user.role|capitalize }}</div>
+                </div>
+                <a class="nav-item danger" href="{{ url_for('auth.logout') }}">
+                    <i data-lucide="log-out"></i><span>Sair</span>
+                </a>
+            </div>
+        </aside>
+
+        <div class="main">
+            <header class="topbar">
+                <div class="topbar-title">{{ title or "Painel" }}</div>
+                <div class="topbar-right">
+                    <span class="pill">{{ current_user.setor or "Sem Setor" }}</span>
+                    <span class="pill">{{ current_user.turno or "—" }}</span>
+                </div>
+            </header>
+
+            <div class="content">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="flashes">
+                            {% for cat, msg in messages %}
+                                <div class="flash {{ cat }}">{{ msg }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    {% endif %}
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        // Inicializar ícones Lucide
+        lucide.createIcons();
+        
+        // Script de Loading no login
+        document.addEventListener('DOMContentLoaded', function() {
+            const loginForm = document.querySelector('.login-form');
+            const loginButton = document.getElementById('loginButton');
+            
+            // Definir ano atual no footer
+            const currentYearElement = document.getElementById('currentYear');
+            if (currentYearElement) {
+                currentYearElement.textContent = new Date().getFullYear();
+            }
+            
+            if (loginForm && loginButton) {
+                loginForm.addEventListener('submit', function(e) {
+                    // Adicionar estado de loading
+                    loginButton.classList.add('loading');
+                    loginButton.innerHTML = `
+                        <svg class="animate-spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                        </svg>
+                        <span>Autenticando...</span>
+                    `;
+                    
+                    // Permitir que o formulário seja enviado
+                    return true;
+                });
+            }
+            
+            // Criar partículas dinâmicas
+            function createParticles() {
+                const container = document.getElementById('particles');
+                if (!container) return;
+                
+                // Limpar partículas existentes
+                container.innerHTML = '';
+                
+                // Criar 20 partículas
+                for (let i = 0; i < 20; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    
+                    // Posição aleatória
+                    const left = Math.random() * 100;
+                    const size = Math.random() * 4 + 2;
+                    
+                    particle.style.left = `${left}%`;
+                    particle.style.width = `${size}px`;
+                    particle.style.height = `${size}px`;
+                    particle.style.animationDelay = `${Math.random() * 8}s`;
+                    particle.style.animationDuration = `${Math.random() * 5 + 5}s`;
+                    
+                    // Opacidade aleatória
+                    particle.style.opacity = Math.random() * 0.4 + 0.1;
+                    
+                    container.appendChild(particle);
+                }
+            }
+            
+            // Criar partículas quando a página carregar
+            createParticles();
+            
+            // Recriar partículas periodicamente
+            setInterval(createParticles, 15000);
+            
+            // Efeito de foco nos inputs
+            const inputs = document.querySelectorAll('.form-input');
+            inputs.forEach(input => {
+                input.addEventListener('focus', function() {
+                    this.style.transform = 'scale(1.01)';
+                });
+                
+                input.addEventListener('blur', function() {
+                    this.style.transform = 'scale(1)';
+                });
+                
+                // Efeito de digitação
+                input.addEventListener('input', function() {
+                    if (this.value) {
+                        this.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+                    } else {
+                        this.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                    }
+                });
+            });
+            
+            // Efeito de hover no card
+            const card = document.querySelector('.login-card');
+            if (card) {
+                card.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-5px) scale(1.01)';
+                    this.style.boxShadow = 
+                        '0 35px 60px -15px rgba(0, 0, 0, 0.6),' +
+                        '0 0 0 1px rgba(255, 255, 255, 0.08),' +
+                        'inset 0 1px 0 rgba(255, 255, 255, 0.15)';
+                });
+                
+                card.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0) scale(1)';
+                    this.style.boxShadow = 
+                        '0 25px 50px -12px rgba(0, 0, 0, 0.5),' +
+                        '0 0 0 1px rgba(255, 255, 255, 0.05),' +
+                        'inset 0 1px 0 rgba(255, 255, 255, 0.1)';
+                });
+            }
+        });
+    </script>
+</body>
+</html>

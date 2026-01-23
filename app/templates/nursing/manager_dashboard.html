@@ -1,0 +1,565 @@
+﻿{% extends "layouts/base.html" %}
+{% block content %}
+
+<div class="dash manager-dash">
+    <div class="page-head">
+        <div class="page-head-left">
+            <h1>📊 Gestão de Ocorrências</h1>
+            <div class="muted">Competência: {{ month_label }} {{ ano }}</div>
+        </div>
+        
+        <div class="month-nav">
+            <a class="icon-btn" href="{{ url_for('nursing_ui.manager_dashboard', ano=prev_ano, mes=prev_mes) }}">←</a>
+            <span style="margin:0 15px; font-weight:bold; color:#fff;">{{ month_label }} / {{ ano }}</span>
+            <a class="icon-btn" href="{{ url_for('nursing_ui.manager_dashboard', ano=next_ano, mes=next_mes) }}">→</a>
+        </div>
+    </div>
+
+    <!-- Cards na horizontal (mantendo o layout original) -->
+    <div class="kpi-grid">
+        <div class="kpi-card danger" onclick="filterByType('FALTA')" title="Filtrar Faltas">
+            <div class="kpi-icon">❌</div>
+            <div class="kpi-content">
+                <div class="kpi-value">{{ count_absent }}</div>
+                <div class="kpi-label">Faltas / Atestados</div>
+            </div>
+        </div>
+        <div class="kpi-card warning" onclick="filterByType('COOP')" title="Filtrar Cooperativa">
+            <div class="kpi-icon">🤝</div>
+            <div class="kpi-content">
+                <div class="kpi-value">{{ count_coop }}</div>
+                <div class="kpi-label">Cooperativas</div>
+            </div>
+        </div>
+        <div class="kpi-card info" onclick="filterByType('BANCO')" title="Filtrar Banco">
+            <div class="kpi-icon">🔄</div>
+            <div class="kpi-content">
+                <div class="kpi-value">{{ count_swaps }}</div>
+                <div class="kpi-label">Banco de Folgas</div>
+            </div>
+        </div>
+        <div class="kpi-card success" onclick="filterByType('PRESENTE')" title="Filtrar Presentes">
+            <div class="kpi-icon">✅</div>
+            <div class="kpi-content">
+                <div class="kpi-value">{{ count_present }}</div>
+                <div class="kpi-label">Presenças Confirmadas</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toolbar">
+        <div class="search-box">
+            <input type="text" id="searchInput" class="input search-input" placeholder="🔍 Pesquisar por Nome, Coren, Matrícula..." onkeyup="filterTable()">
+        </div>
+        
+        <div class="actions">
+            <select id="typeFilter" class="input select-filter" onchange="filterTable()">
+                <option value="all">📁 Todos os Tipos</option>
+                <option value="PRESENTE">✅ Presentes</option>
+                <option value="FALTA">❌ Faltas</option>
+                <option value="COOP">🤝 Cooperativa</option>
+                <option value="BANCO">🔄 Banco de Folgas</option>
+                <option value="EXTRA">⚡ Extras (Pagos)</option>
+            </select>
+            <button class="btn" onclick="window.print()">🖨️ Imprimir</button>
+        </div>
+    </div>
+
+    <div class="card master-table-card">
+        <div class="table-wrap">
+            <table class="table" id="masterTable">
+                <thead>
+                    <tr>
+                        <th width="100">Data</th>
+                        <th>Profissional</th>
+                        <th>Tipo</th>
+                        <th class="text-center">Turno</th>
+                        <th>Detalhes / Observação</th>
+                        <th width="50"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if occurrences %}
+                        {% for item in occurrences %}
+                        <tr class="row-item" data-type="{{ item.type }}" data-search="{{ item.user.nome if item.user else item.override.coop_name }} {{ item.user.matricula if item.user else item.override.coop_coren }}">
+                            <td style="font-weight:bold; color:#fff;">
+                                {{ item.override.date.strftime('%d/%m') }}
+                                <div class="muted" style="font-size:0.75rem; font-weight:normal;">{{ item.override.date.strftime('%a') }}</div>
+                            </td>
+
+                            <td>
+                                {% if item.type == 'COOP' %}
+                                    <div style="font-weight: bold; color: #fbbf24;">{{ item.override.coop_name }}</div>
+                                    <div class="muted" style="font-size: 0.8rem;">
+                                        <span class="tag-coop">COOP</span>
+                                        {{ item.override.coop_role }} • {{ item.override.coop_coren }}
+                                    </div>
+                                {% else %}
+                                    <div style="font-weight: bold; color: #eee;">{{ item.user.nome }}</div>
+                                    <div class="muted" style="font-size: 0.8rem;">{{ item.sector.name if item.sector else "—" }}</div>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if item.type == 'FALTA' %} <span class="badge danger">Falta</span>
+                                {% elif item.type == 'COOP' %} <span class="badge warning">Cooperativa</span>
+                                {% elif item.type == 'BANCO' %} <span class="badge info">Banco de Horas</span>
+                                {% elif item.type == 'EXTRA' %} <span class="badge purple">Extra</span>
+                                {% elif item.type == 'PRESENTE' %} <span class="badge success">Presente</span>
+                                {% endif %}
+                            </td>
+
+                            <td class="text-center">
+                                {% if item.override.shift %}
+                                    <span class="shift-pill">{{ item.override.shift }}</span>
+                                {% else %}
+                                    <span class="shift-pill">{{ item.user.turno or "-" }}</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <div style="color: #ccc;">{{ item.override.description or "" }}</div>
+                                {% if item.override.related_date %}
+                                    <div class="folga-info">
+                                        ↪ Folga: <strong>{{ item.override.related_date.strftime('%d/%m/%Y') }}</strong>
+                                    </div>
+                                {% endif %}
+                            </td>
+
+                            <td class="text-right">
+                                <a href="{{ url_for('nursing_ui.daily', date=item.override.date) }}" class="btn-link" title="Ver na Escala">↪</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="empty-state">
+                                Nenhum registro encontrado neste mês.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+function filterTable() {
+    const input = document.getElementById("searchInput").value.toLowerCase();
+    const typeFilter = document.getElementById("typeFilter").value;
+    const rows = document.querySelectorAll(".row-item");
+
+    rows.forEach(row => {
+        const text = row.getAttribute("data-search").toLowerCase();
+        const type = row.getAttribute("data-type");
+        const matchesSearch = text.includes(input);
+        const matchesType = (typeFilter === "all") || (type === typeFilter);
+        row.style.display = (matchesSearch && matchesType) ? "" : "none";
+    });
+}
+
+function filterByType(type) {
+    document.getElementById("typeFilter").value = type;
+    filterTable();
+}
+</script>
+
+<style>
+/* Layout */
+.dash { padding: 20px; max-width: 1400px; margin: 0 auto; }
+
+.page-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.page-head-left h1 {
+    color: #fff;
+    font-size: 1.8rem;
+    margin: 0 0 5px 0;
+}
+
+.page-head-left .muted {
+    color: #888;
+    font-size: 0.9rem;
+}
+
+.month-nav {
+    background: #1a1a1a;
+    padding: 8px 15px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    display: inline-flex;
+    align-items: center;
+}
+
+.icon-btn {
+    text-decoration: none;
+    color: #fff;
+    padding: 0 10px;
+    font-size: 1.2rem;
+    transition: color 0.2s;
+    cursor: pointer;
+}
+
+.icon-btn:hover {
+    color: #3b82f6;
+}
+
+/* KPIs na horizontal - layout original */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.kpi-card {
+    background: #1e1e1e;
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid #333;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    transition: all 0.2s;
+    cursor: pointer;
+    min-height: 100px;
+}
+
+.kpi-card:hover {
+    transform: translateY(-3px);
+    background: #252525;
+}
+
+/* Cores dos Cards */
+.kpi-card.danger { border-bottom: 3px solid #ef4444; }
+.kpi-card.warning { border-bottom: 3px solid #f59e0b; }
+.kpi-card.info { border-bottom: 3px solid #3b82f6; }
+.kpi-card.success { border-bottom: 3px solid #10b981; }
+
+.kpi-icon {
+    font-size: 2rem;
+    background: rgba(255,255,255,0.05);
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+.kpi-content {
+    flex: 1;
+}
+
+.kpi-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #fff;
+    line-height: 1;
+    margin-bottom: 5px;
+}
+
+.kpi-label {
+    font-size: 0.85rem;
+    color: #888;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Toolbar */
+.toolbar {
+    display: flex;
+    gap: 15px;
+    margin-top: 25px;
+    align-items: center;
+    flex-wrap: wrap;
+    background: #1a1a1a;
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid #333;
+}
+
+.search-box {
+    flex: 1;
+    min-width: 300px;
+}
+
+.search-input {
+    width: 100%;
+    padding: 10px 15px;
+    background: #111;
+    border: 1px solid #444;
+    color: white;
+    border-radius: 8px;
+    outline: none;
+    transition: border 0.2s;
+    font-size: 0.9rem;
+}
+
+.search-input:focus {
+    border-color: #3b82f6;
+}
+
+.actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.select-filter {
+    background: #111;
+    color: white;
+    padding: 10px 15px;
+    border-radius: 8px;
+    border: 1px solid #444;
+    cursor: pointer;
+    font-size: 0.9rem;
+    min-width: 180px;
+}
+
+.btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: #2a2a2a;
+    color: #ccc;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+}
+
+.btn:hover {
+    background: #333;
+    color: #fff;
+    border-color: #444;
+}
+
+/* Tabela */
+.master-table-card {
+    margin-top: 20px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #333;
+    background: #1a1a1a;
+}
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 1000px;
+}
+
+.table th {
+    background: #222;
+    color: #aaa;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    padding: 15px;
+    text-align: left;
+    border-bottom: 1px solid #333;
+}
+
+.table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #222;
+    vertical-align: middle;
+}
+
+.row-item:hover {
+    background: rgba(255,255,255,0.03);
+}
+
+/* Badges */
+.badge {
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-block;
+}
+
+.badge.danger {
+    background: rgba(239, 68, 68, 0.15);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.badge.warning {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fcd34d;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge.info {
+    background: rgba(59, 130, 246, 0.15);
+    color: #93c5fd;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.badge.purple {
+    background: rgba(168, 85, 247, 0.15);
+    color: #d8b4fe;
+    border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.badge.success {
+    background: rgba(16, 185, 129, 0.15);
+    color: #6ee7b7;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Elementos */
+.tag-coop {
+    background: #451a03;
+    color: #fcd34d;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    margin-right: 5px;
+}
+
+.shift-pill {
+    display: inline-block;
+    width: 30px;
+    height: 30px;
+    line-height: 30px;
+    border-radius: 50%;
+    font-weight: bold;
+    font-size: 0.85rem;
+    text-align: center;
+    background: #333;
+    color: #ccc;
+    border: 1px solid #444;
+}
+
+.folga-info {
+    margin-top: 5px;
+    font-size: 0.8rem;
+    color: #93c5fd;
+    background: rgba(59, 130, 246, 0.1);
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+}
+
+.btn-link {
+    color: #555;
+    text-decoration: none;
+    font-size: 1.2rem;
+    transition: color 0.2s;
+}
+
+.btn-link:hover {
+    color: #3b82f6;
+}
+
+.empty-state {
+    padding: 40px;
+    text-align: center;
+    color: #666;
+    font-size: 1.1rem;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.muted {
+    color: #888;
+}
+
+/* Responsividade */
+@media (max-width: 1200px) {
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .page-head {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .month-nav {
+        align-self: stretch;
+        justify-content: center;
+    }
+    
+    .kpi-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .search-box {
+        min-width: auto;
+    }
+    
+    .actions {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .select-filter, .btn {
+        width: 100%;
+    }
+    
+    .table {
+        min-width: auto;
+    }
+    
+    .table th, .table td {
+        padding: 10px 8px;
+        font-size: 0.85rem;
+    }
+}
+
+/* Scrollbar personalizada */
+.table-wrap::-webkit-scrollbar {
+    height: 6px;
+}
+
+.table-wrap::-webkit-scrollbar-track {
+    background: #1a1a1a;
+    border-radius: 3px;
+}
+
+.table-wrap::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 3px;
+}
+
+.table-wrap::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+</style>
+
+{% endblock %}

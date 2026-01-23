@@ -1,0 +1,522 @@
+                // Usar a rota API do nursing
+                const response = await fetch(`/nursing/api/daily?${params}`);
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Erro ao carregar dados');
+                }
+                
+                dailyRecords = data.daily_records || [];
+                
+                console.log('Registros carregados:', dailyRecords); // Para debug
+                
+                // Atualizar tabela
+                renderTable();
+                
+                // Atualizar estatísticas
+                updateStatistics(data.stats);
+                
+                showToast('Registros carregados com sucesso', 'success');
+                
+            } catch (error) {
+                console.error('Erro ao carregar registros:', error);
+                showToast('Erro ao carregar registros do dia: ' + error.message, 'error');
+                dailyRecords = [];
+                renderTable();
+                updateStatistics({ 
+                    total: 0, 
+                    present: 0, 
+                    coop: 0, 
+                    absent: 0, 
+                    pending: 0,
+                    swap: 0
+                });
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Carregar trocas aprovadas
+        async function loadSwaps() {
+            try {
+                showLoading(true);
+                
+                // Buscar trocas aprovadas para a data atual
+                const response = await fetch(`/nursing/api/swaps/approved?date=${currentDate}`);
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Erro ao carregar trocas');
+                }
+                
+                if (data.count === 0) {
+                    showToast('Nenhuma troca aprovada para esta data', 'info');
+                    return;
+                }
+                
+                // Para cada troca aprovada, adicionar o substituto como um registro de troca
+                data.swaps.forEach(swap => {
+                    // Adicionar o substituto como um registro de troca
+                    dailyRecords.push({
+                        id: `swap_${swap.substitute_user_id}_${swap.id}`,
+                        user_id: swap.substitute_user_id,
+                        name: swap.substitute_user_name,
+                        cargo: "Substituto",
+                        sector_name: swap.sector_name,
+                        sector_id: swap.sector_id,
+                        shift: swap.shift,
+                        status: "AGUARDANDO",
+                        tipo: "TROCA",
+                        horario: swap.shift === 'D' ? "07:00 - 19:00" : "19:00 - 07:00",
+                        swap_info: {
+                            requester_name: swap.original_user_name,
+                            original_user_id: swap.original_user_id,
+                            swap_id: swap.id,
+                            is_substitute: true
+                        }
+                    });
+                    
+                    // Marcar o original como troca (se estiver na lista)
+                    const originalIndex = dailyRecords.findIndex(r => 
+                        r.user_id === swap.original_user_id
+                    );
+                    
+                    if (originalIndex !== -1) {
+                        dailyRecords[originalIndex].tipo = 'TROCA';
+                        dailyRecords[originalIndex].swap_info = {
+                            substitute_name: swap.substitute_user_name,
+                            substitute_user_id: swap.substitute_user_id,
+                            swap_id: swap.id,
+                            is_substitute: false
+                        };
+                    }
+                });
+                
+                // Atualizar tabela
+                renderTable();
+                updateStatisticsFromRecords();
+                
+                showToast(`${data.count} troca(s) aprovada(s) carregada(s) com sucesso`, 'success');
+                
+            } catch (error) {
+                console.error('Erro ao carregar trocas:', error);
+                showToast('Erro ao carregar trocas: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Função para escapar HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Renderizar tabela - CORRIGIDA
+        function renderTable() {
+            const tbody = document.getElementById('staffTableBody');
+            tbody.innerHTML = '';
+
+            if (dailyRecords.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center py-5">
+                            <div class="text-muted">
+                                <i class="bi bi-clipboard-x" style="font-size: 48px;"></i>
+                                <p class="mt-3">Nenhum registro encontrado para esta data</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            dailyRecords.forEach(record => {
+                const statusBadge = getStatusBadge(record.status);
+                const tipoBadge = getTipoBadge(record.tipo);
+                const shiftPill = record.shift === 'D' ? 
+                    '<span class="shift-pill day">D</span>' : 
+                    '<span class="shift-pill night">N</span>';
+                
+                // Determinar classe da linha baseada no tipo
+                let rowClass = '';
+                if (record.tipo === 'TROCA') {
+                    rowClass = 'row-troca';
+                } else if (record.tipo === 'COOP') {
+                    rowClass = 'row-coop';
+                }
+                
+                // Criar indicador de troca se for uma troca
+                let swapIndicator = '';
+                if (record.tipo === 'TROCA' && record.swap_info) {
+                    if (record.swap_info.is_substitute && record.swap_info.requester_name) {
+                        swapIndicator = `
+                            <div class="swap-indicator">
+                                <i class="bi bi-arrow-left-right"></i>
+                                Substituindo: ${escapeHtml(record.swap_info.requester_name)}
+                            </div>
+                        `;
+                    } else if (!record.swap_info.is_substitute && record.swap_info.substitute_name) {
+                        swapIndicator = `
+                            <div class="swap-indicator">
+                                <i class="bi bi-arrow-left-right"></i>
+                                Sendo substituído por: ${escapeHtml(record.swap_info.substitute_name)}
+                            </div>
+                        `;
+                    }
+                }
+
+                // Determinar botões de ação
+                const actionButtons = record.status === 'P' || record.status === 'F' || record.status === 'AT' || record.status === 'COOP' ?
+                    `<div class="action-buttons">
+                        <button type="button" class="btn-action btn-more"
+                                onclick="abrirModalStatus('${record.id}', ${record.user_id}, '${escapeHtml(record.name)}', '${escapeHtml(record.cargo)}', '${record.tipo}')"
+                                title="Alterar status">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                    </div>` :
+                    `<div class="action-buttons">
+                        <button type="button" class="btn-action btn-present" 
+                                onclick="quickAction('${record.id}', ${record.user_id}, 'P')"
+                                data-record-id="${record.id}"
+                                title="Confirmar Presença">
+                            ✓
+                        </button>
+                        <button type="button" class="btn-action btn-absent"
+                                onclick="quickAction('${record.id}', ${record.user_id}, 'F')"
+                                data-record-id="${record.id}"
+                                title="Registrar Falta">
+                            ✗
+                        </button>
+                        <button type="button" class="btn-action btn-more"
+                                onclick="abrirModalStatus('${record.id}', ${record.user_id}, '${escapeHtml(record.name)}', '${escapeHtml(record.cargo)}', '${record.tipo}')"
+                                title="Mais opções">
+                            ⋯
+                        </button>
+                    </div>`;
+
+                const row = `
+                    <tr class="row-item ${rowClass}" 
+                        data-record-id="${record.id}"
+                        data-user-id="${record.user_id}"
+                        data-status="${record.status}" 
+                        data-sector="${record.sector_id}"
+                        data-shift="${record.shift}"
+                        data-tipo="${record.tipo}"
+                        id="row-${record.id}">
+                        <td>
+                            <div style="font-weight: bold; color: #eee;">${escapeHtml(record.name)}</div>
+                            <div class="muted" style="font-size: 0.8rem;">${escapeHtml(record.cargo)}</div>
+                            ${swapIndicator}
+                        </td>
+                        <td>
+                            ${tipoBadge}
+                        </td>
+                        <td>
+                            <span class="tag-sector">${escapeHtml(record.sector_name)}</span>
+                        </td>
+                        <td>
+                            ${shiftPill}
+                            <div class="text-muted x-small mt-1">${escapeHtml(record.horario)}</div>
+                        </td>
+                        <td class="text-center" id="status-cell-${record.id}">
+                            ${statusBadge}
+                        </td>
+                        <td class="text-center" id="actions-cell-${record.id}">
+                            ${actionButtons}
+                        </td>
+                    </tr>
+                `;
+                
+                tbody.innerHTML += row;
+            });
+        }
+
+        // Obter badge de tipo
+        function getTipoBadge(tipo) {
+            switch(tipo) {
+                case 'FIXO':
+                    return '<span class="badge fixo">Fixo</span>';
+                case 'COOP':
+                    return '<span class="badge coop">Cooperativa</span>';
+                case 'TROCA':
+                    return '<span class="badge troca">Troca</span>';
+                case 'EXTRA':
+                    return '<span class="badge extra">Extra</span>';
+                default:
+                    return '<span class="badge fixo">Fixo</span>';
+            }
+        }
+
+        // Obter badge de status
+        function getStatusBadge(status) {
+            switch(status) {
+                case 'AGUARDANDO':
+                    return '<span class="badge waiting">⏳ Aguardando</span>';
+                case 'P':
+                    return '<span class="badge present">✅ Presente</span>';
+                case 'F':
+                    return '<span class="badge absent">❌ Falta</span>';
+                case 'AT':
+                    return '<span class="badge atestado">📄 Atestado</span>';
+                case 'COOP':
+                    return '<span class="badge coop">🤝 Cooperativa</span>';
+                default:
+                    return '<span class="badge waiting">⏳ Aguardando</span>';
+            }
+        }
+
+        // Aplicar filtros
+        function applyFilters() {
+            currentDate = document.getElementById('filterDate').value;
+            selectedSector = document.getElementById('filterSector').value;
+            selectedShift = document.getElementById('filterShift').value;
+            
+            loadDailyRecords();
+        }
+
+        // Limpar filtros
+        function clearFilters() {
+            const today = new Date();
+            const formattedDate = today.toISOString().split('T')[0];
+            
+            document.getElementById('filterDate').value = formattedDate;
+            document.getElementById('filterSector').value = 'all';
+            document.getElementById('filterShift').value = 'all';
+            
+            currentDate = formattedDate;
+            selectedSector = 'all';
+            selectedShift = 'all';
+            
+            loadDailyRecords();
+        }
+
+        // Atualizar estatísticas
+        function updateStatistics(stats) {
+            document.getElementById('totalCount').textContent = stats.total;
+            document.getElementById('presentCount').textContent = stats.present;
+            document.getElementById('absentCount').textContent = stats.absent;
+            document.getElementById('pendingCount').textContent = stats.pending;
+            document.getElementById('swapCount').textContent = stats.swap;
+            document.getElementById('filteredCount').textContent = stats.total;
+        }
+
+        // Atualizar estatísticas a partir dos registros
+        function updateStatisticsFromRecords() {
+            const total = dailyRecords.length;
+            const present = dailyRecords.filter(r => r.status === 'P').length;
+            const absent = dailyRecords.filter(r => r.status === 'F' || r.status === 'AT').length;
+            const pending = dailyRecords.filter(r => r.status === 'AGUARDANDO').length;
+            const coop = dailyRecords.filter(r => r.tipo === 'COOP').length;
+            const swap = dailyRecords.filter(r => r.tipo === 'TROCA').length;
+            
+            updateStatistics({
+                total,
+                present,
+                absent,
+                pending,
+                coop,
+                swap
+            });
+        }
+
+        // Abrir modal de escolha do tipo
+        function abrirModalTipoProfissional() {
+            if (window.modalTipoRef) {
+                window.modalTipoRef.show();
+            }
+        }
+
+        // Abrir modal para buscar profissional
+        function abrirModalBuscarProfissional() {
+            if (window.modalTipoRef) window.modalTipoRef.hide();
+            if (window.modalBuscarRef) {
+                document.getElementById('searchProfessional').value = '';
+                document.getElementById('professionalsList').innerHTML = `
+                    <div class="text-center text-muted">
+                        Digite para buscar profissionais
+                    </div>
+                `;
+                window.modalBuscarRef.show();
+            }
+        }
+
+        // Buscar profissionais
+        async function buscarProfissionais() {
+            const query = document.getElementById('searchProfessional').value.trim();
+            
+            if (query.length < 2) {
+                document.getElementById('professionalsList').innerHTML = `
+                    <div class="text-center text-muted">
+                        Digite pelo menos 2 caracteres
+                    </div>
+                `;
+                return;
+            }
+            
+            try {
+                showLoading(true);
+                
+                const response = await fetch(`/nursing/api/users/search?q=${encodeURIComponent(query)}`);
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                const professionalsList = document.getElementById('professionalsList');
+                professionalsList.innerHTML = '';
+                
+                if (!data.items || data.items.length === 0) {
+                    professionalsList.innerHTML = `
+                        <div class="text-center text-muted">
+                            Nenhum profissional encontrado
+                        </div>
+                    `;
+                    return;
+                }
+                
+                data.items.forEach(prof => {
+                    const profElement = document.createElement('div');
+                    profElement.className = 'card mb-2';
+                    profElement.style.backgroundColor = 'var(--darker-bg)';
+                    profElement.style.border = '1px solid var(--border-color)';
+                    
+                    profElement.innerHTML = `
+                        <div class="card-body py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1" style="color: var(--text-color);">${escapeHtml(prof.name)}</h6>
+                                    <small class="text-muted">${escapeHtml(prof.role_label || '')} • ${escapeHtml(prof.matricula || '')}</small>
+                                    <div class="mt-1">
+                                        <small class="badge bg-primary">${escapeHtml(prof.turno || 'Não definido')}</small>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-primary" 
+                                        onclick="adicionarProfissionalFixo(${prof.id}, '${escapeHtml(prof.name)}', '${escapeHtml(prof.role_label || '')}')">
+                                    <i class="bi bi-plus"></i> Adicionar
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    professionalsList.appendChild(profElement);
+                });
+                
+            } catch (error) {
+                console.error('Erro ao buscar profissionais:', error);
+                showToast('Erro ao buscar profissionais: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Adicionar profissional fixo
+        async function adicionarProfissionalFixo(userId, nome, cargo) {
+            try {
+                // Fechar modais
+                if (window.modalBuscarRef) window.modalBuscarRef.hide();
+                
+                // Preparar dados para enviar
+                const dados = {
+                    user_id: userId,
+                    date: currentDate,
+                    status: 'AGUARDANDO'
+                };
+                
+                // Usar a rota correta do nursing
+                const addResponse = await fetch('/nursing/daily/add_professional', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(dados)
+                });
+                
+                const result = await addResponse.json();
+                
+                if (!result.success) {
+                    throw new Error(result.error || 'Erro ao adicionar profissional');
+                }
+                
+                showToast('Profissional adicionado com sucesso!', 'success');
+                
+                // Recarregar registros
+                loadDailyRecords();
+                
+            } catch (error) {
+                console.error('Erro ao adicionar profissional:', error);
+                showToast('Erro ao adicionar profissional: ' + error.message, 'error');
+            }
+        }
+
+        // Abrir modal de cooperativa
+        function abrirModalCooperativa() {
+            if (window.modalTipoRef) window.modalTipoRef.hide();
+            if (window.modalCoopRef) {
+                document.getElementById('formCooperativa').reset();
+                window.modalCoopRef.show();
+            }
+        }
+
+        // Abrir modal de status
+        function abrirModalStatus(recordId, userId, nome, cargo, tipo) {
+            document.getElementById('recordIdNoModal').value = recordId;
+            document.getElementById('recordUserIdNoModal').value = userId;
+            document.getElementById('recordTipoNoModal').value = tipo;
+            document.getElementById('nomeNoModal').textContent = nome;
+            document.getElementById('cargoNoModal').textContent = cargo;
+            document.getElementById('dateNoModal').value = currentDate;
+            
+            // Adicionar informação sobre troca se for o caso
+            const infoTroca = document.getElementById('infoTrocaNoModal');
+            const record = dailyRecords.find(r => r.id === recordId);
+            
+            if (record && record.tipo === 'TROCA' && record.swap_info) {
+                if (record.swap_info.is_substitute && record.swap_info.requester_name) {
+                    infoTroca.textContent = `Substituindo: ${record.swap_info.requester_name}`;
+                } else if (!record.swap_info.is_substitute && record.swap_info.substitute_name) {
+                    infoTroca.textContent = `Sendo substituído por: ${record.swap_info.substitute_name}`;
+                }
+            } else {
+                infoTroca.textContent = '';
+            }
+            
+            if (window.modalRef) {
+                window.modalRef.show();
+            }
+        }
+
+        // Salvar cooperativa
+        async function salvarCooperativa() {
+            const form = document.getElementById('formCooperativa');
+            
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+            
+            const setorSelect = document.getElementById('setorCoop');
+            const setorId = setorSelect.value;
+            
+            if (!setorId) {
+                showToast('Por favor, selecione um setor', 'error');
+                return;
+            }
+            
+            // Para cooperativa, criamos um usuário temporário
+            const tempUserId = -Math.floor(Math.random() * 10000);
+            
+            const dados = {
+                user_id: tempUserId,
+                date

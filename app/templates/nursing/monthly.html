@@ -1,132 +1,436 @@
-﻿{% extends "layouts/base.html" %}
-{% block content %}
+﻿from __future__ import annotations
 
-<div class="dash nursing-monthly">
+import calendar
+from typing import Any, Dict, List
+from datetime import date, datetime, timedelta
 
-  <!-- Cabeçalho -->
-  <div class="page-head">
-    <div class="page-head-left">
-      <h1>📅 Escalas Mensais</h1>
-      <div class="muted">
-        Unidade: {{ unidade_nome or "—" }}
-        {% if active_sector %} • Setor: {{ active_sector.name }}{% endif %}
-      </div>
-    </div>
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, jsonify
+from flask_login import login_required, current_user
 
-    <div class="head-actions">
-      <button class="btn" type="button" disabled title="Em breve: exportar PDF">
-        ⬇ Exportar PDF
-      </button>
+from app.extensions import db
+from app.models import (
+    Sector, 
+    User, 
+    NursingMonthlySchedule, 
+    NursingMonthlyMember, 
+    NursingMonthlyCell, 
+    NursingDailyOverride
+)
 
-      {% if current_user.role in ['manager','admin'] %}
-        <button class="btn primary" type="button" disabled title="Em breve: novo plantão">
-          ＋ Novo Plantão
-        </button>
-      {% endif %}
-    </div>
-  </div>
+try:
+    from app.extensions import csrf
+except ImportError:
+    csrf = None
 
-  <!-- Seletor de Setor -->
-  <div class="sector-tabs">
-    {% for sec in sectors %}
-      <a
-        class="tab {% if sec.id == active_sector_id %}active{% endif %}"
-        href="{{ url_for('nursing_ui.monthly_page', sector_id=sec.id, ano=ano, mes=mes, q=q) }}"
-        title="Abrir {{ sec.name }}"
-      >
-        {{ sec.name }}
-      </a>
-    {% endfor %}
-  </div>
+def exempt_csrf(f):
+    if csrf and hasattr(csrf, 'exempt'):
+        return csrf.exempt(f)
+    return f
 
-  <!-- Controles: mês + busca -->
-  <div class="controls-card">
-    <div class="month-nav">
-      <a class="icon-btn"
-         href="{{ url_for('nursing_ui.monthly_page', sector_id=active_sector_id, ano=prev_ano, mes=prev_mes, q=q) }}"
-         title="Mês anterior">‹</a>
+bp = Blueprint("nursing_ui", __name__, url_prefix="/nursing")
 
-      <div class="month-title">{{ month_label }} {{ ano }}</div>
+# --- Helpers ---
+MONTHS_PT = {1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril", 5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto", 9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"}
 
-      <a class="icon-btn"
-         href="{{ url_for('nursing_ui.monthly_page', sector_id=active_sector_id, ano=next_ano, mes=next_mes, q=q) }}"
-         title="Próximo mês">›</a>
-    </div>
+def month_name(m: int) -> str:
+    return MONTHS_PT.get(int(m), "") if str(m).isdigit() else ""
 
-    <form class="searchbar" method="get" action="{{ url_for('nursing_ui.monthly_page') }}">
-      <input type="hidden" name="sector_id" value="{{ active_sector_id }}">
-      <input type="hidden" name="ano" value="{{ ano }}">
-      <input type="hidden" name="mes" value="{{ mes }}">
-      <input class="input" name="q" value="{{ q or '' }}" placeholder="Buscar profissional (nome, função, matrícula)..." />
-      <button class="icon-btn" type="submit" title="Buscar">🔎</button>
-    </form>
-  </div>
+@bp.app_context_processor
+def inject_globals():
+    return {"month_name": month_name, "current_year": date.today().year, "timedelta": timedelta}
 
-  <!-- Tabela mensal -->
-  <div class="grid-card">
-    <div class="grid-scroll">
-      <table class="month-grid">
-        <thead>
-          <tr>
-            <th class="sticky-col">Profissional</th>
-            {% for d in days %}
-              <th class="day-head {% if d.is_weekend %}weekend{% endif %}">
-                {{ "%02d"|format(d.day) }}
-              </th>
-            {% endfor %}
-          </tr>
-        </thead>
+def _require_manager():
+    if getattr(current_user, "role", "") not in ("manager", "admin"): abort(403)
 
-        <tbody>
-          {% if not professionals %}
-            <tr>
-              <td class="empty" colspan="{{ (days|length) + 1 }}">
-                Nenhum profissional encontrado.
-              </td>
-            </tr>
-          {% else %}
-            {% for p in professionals %}
-              <tr>
-                <td class="sticky-col">
-                  <div class="pname">{{ p.name }}</div>
-                  <div class="prole">
-                    {{ p.role_label or p.role or "—" }}
-                    {% if p.matricula %} • {{ p.matricula }}{% endif %}
-                    {% if p.turno %} • {{ p.turno }}{% endif %}
-                  </div>
-                </td>
+def _build_days(ano: int, mes: int) -> List[Dict[str, Any]]:
+    last_day = calendar.monthrange(ano, mes)[1]
+    out = []
+    for d in range(1, last_day + 1):
+        wd = date(ano, mes, d).weekday()
+        out.append({"day": d, "is_weekend": wd >= 5})
+    return out
 
-                {% for d in days %}
-                  {% set code = (cell_map.get(p.user_id, {}).get(d.day, '')) %}
-                  <td class="cell {% if d.is_weekend %}weekend{% endif %}">
-                    {% if code %}
-                      <a class="chip chip-{{ code|lower }}" href="javascript:void(0)" title="Dia {{ d.day }} • {{ code }}">
-                        {{ code }}
-                      </a>
-                    {% else %}
-                      <span class="chip chip-empty">—</span>
-                    {% endif %}
-                  </td>
-                {% endfor %}
-              </tr>
-            {% endfor %}
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
+def _month_nav(ano: int, mes: int):
+    dt = date(ano, mes, 1)
+    prev = dt - timedelta(days=1)
+    next_m = (dt + timedelta(days=32)).replace(day=1)
+    return prev.year, prev.month, next_m.year, next_m.month
 
-    <!-- Legenda -->
-    <div class="legend">
-      <span class="lg"><span class="dot dot-m"></span> M: Manhã</span>
-      <span class="lg"><span class="dot dot-t"></span> T: Tarde</span>
-      <span class="lg"><span class="dot dot-n"></span> N: Noite</span>
-      <span class="lg"><span class="dot dot-d"></span> D: Diurno</span>
-      <span class="lg"><span class="dot dot-f"></span> F: Folga</span>
-      <span class="lg"><span class="dot dot-fe"></span> FE: Férias</span>
-      <span class="lg"><span class="dot dot-at"></span> AT: Atestado</span>
-    </div>
-  </div>
+# --- LÓGICA DE PREENCHIMENTO (12x36) ---
+def _auto_fill_user_month(schedule_id, user_id, year, month, pattern='odd'):
+    user = User.query.get(user_id)
+    if not user: return
 
-</div>
+    # Se não tiver turno definido, assume 'D'
+    shift_code = user.turno.upper() if user.turno else 'D'
+    
+    _, num_days = calendar.monthrange(year, month)
+    
+    for day in range(1, num_days + 1):
+        should_work = False
+        if pattern == 'odd':
+            should_work = (day % 2 != 0) # Dias Ímpares (1, 3, 5...)
+        elif pattern == 'even':
+            should_work = (day % 2 == 0) # Dias Pares (2, 4, 6...)
+            
+        if should_work:
+            # Verifica se já existe para não duplicar/erro
+            exists = NursingMonthlyCell.query.filter_by(schedule_id=schedule_id, planned_user_id=user_id, day=day).first()
+            if not exists:
+                db.session.add(NursingMonthlyCell(
+                    schedule_id=schedule_id, 
+                    planned_user_id=user_id, 
+                    day=day, 
+                    shift=shift_code
+                ))
 
-{% endblock %}
+# ==========================================
+# ROTAS DE NAVEGAÇÃO E GESTÃO
+# ==========================================
+
+@bp.get("/scales")
+@login_required
+def year_view():
+    _require_manager()
+    ano = int(request.args.get("ano") or date.today().year)
+    months_list = []
+    for m in range(1, 13):
+        count = NursingMonthlySchedule.query.filter_by(year=ano, month=m).count()
+        months_list.append({"num": m, "name": month_name(m), "active_scales_count": count})
+    return render_template("nursing/years_view.html", title=f"Escalas {ano}", ano=ano, months_list=months_list)
+
+@bp.get("/scales/<int:ano>/<int:mes>")
+@login_required
+def month_details(ano: int, mes: int):
+    # ✅ RESTAURADO: Lista setores para criar escala ou editar existente
+    _require_manager()
+    
+    # 1. Escalas já criadas neste mês
+    schedules = NursingMonthlySchedule.query.filter_by(year=ano, month=mes).all()
+    existing_scales = []
+    created_sector_ids = []
+    
+    for s in schedules:
+        created_sector_ids.append(s.sector_id)
+        sec = Sector.query.get(s.sector_id)
+        prof_count = NursingMonthlyMember.query.filter_by(schedule_id=s.id, active=True).count()
+        existing_scales.append({
+            "id": s.id,
+            "sector_name": sec.name if sec else f"Setor {s.sector_id}",
+            "prof_count": prof_count,
+            "status": s.status
+        })
+        
+    # 2. Setores disponíveis (que ainda não tem escala criada)
+    all_sectors = Sector.query.filter_by(active=True).order_by(Sector.name).all()
+    available_sectors = [s for s in all_sectors if s.id not in created_sector_ids]
+
+    return render_template(
+        "nursing/month_details.html",
+        title=f"{month_name(mes)} {ano}",
+        ano=ano, mes=mes,
+        existing_scales=existing_scales,
+        available_sectors=available_sectors,
+        month_label=month_name(mes)
+    )
+
+@bp.post("/scales/create")
+@login_required
+def create_scale_action():
+    _require_manager()
+    ano = int(request.form.get("ano") or 0)
+    mes = int(request.form.get("mes") or 0)
+    sector_id = int(request.form.get("sector_id") or 0)
+    
+    if not ano or not sector_id:
+        flash("Dados inválidos", "error")
+        return redirect(url_for("nursing_ui.year_view"))
+    
+    # Verifica se já existe
+    exists = NursingMonthlySchedule.query.filter_by(sector_id=sector_id, year=ano, month=mes).first()
+    if exists:
+        return redirect(url_for("nursing_ui.editor_view", ano=ano, mes=mes, sector_id=sector_id))
+        
+    # Cria nova
+    sched = NursingMonthlySchedule(
+        sector_id=sector_id, 
+        year=ano, 
+        month=mes, 
+        status="draft", 
+        created_by_id=getattr(current_user, "id", None)
+    )
+    db.session.add(sched)
+    db.session.commit()
+    
+    return redirect(url_for("nursing_ui.editor_view", ano=ano, mes=mes, sector_id=sector_id))
+
+# ---------------------------------------------------------------------
+# EDITOR DE ESCALA (Visual Excel + Agrupamento)
+# ---------------------------------------------------------------------
+@bp.get("/scales/<int:ano>/<int:mes>/<int:sector_id>")
+@login_required
+def editor_view(ano: int, mes: int, sector_id: int):
+    _require_manager()
+    
+    # Garante que a escala existe ou cria rascunho
+    sched = NursingMonthlySchedule.query.filter_by(sector_id=sector_id, year=ano, month=mes).first()
+    if not sched:
+        sched = NursingMonthlySchedule(sector_id=sector_id, year=ano, month=mes, status="draft", created_by_id=getattr(current_user, "id", None))
+        db.session.add(sched)
+        db.session.commit()
+    
+    sector = Sector.query.get(sector_id)
+    days = _build_days(ano, mes)
+    
+    # Busca dados
+    members = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, active=True).all()
+    member_ids = [m.user_id for m in members]
+    
+    cells = NursingMonthlyCell.query.filter_by(schedule_id=sched.id).all()
+    cell_map = {}
+    for c in cells:
+        uid = getattr(c, "planned_user_id", getattr(c, "user_id", None))
+        if uid:
+            if uid not in cell_map: cell_map[uid] = {}
+            cell_map[uid][c.day] = c.shift
+
+    users = User.query.filter(User.id.in_(member_ids)).all()
+    
+    # Agrupamento (Par/Impar/Turno)
+    groups_data = {
+        "PLANTÃO DIURNO PAR": [],
+        "PLANTÃO DIURNO ÍMPAR": [],
+        "PLANTÃO NOTURNO PAR": [],
+        "PLANTÃO NOTURNO ÍMPAR": [],
+        "AFASTADAS / OUTROS": []
+    }
+
+    for u in users:
+        u_cells = cell_map.get(u.id, {})
+        t = (u.turno or "D").upper()
+        
+        even_days = [d for d, s in u_cells.items() if s in ['D','N'] and d % 2 == 0]
+        odd_days = [d for d, s in u_cells.items() if s in ['D','N'] and d % 2 != 0]
+        
+        count_even = len(even_days)
+        count_odd = len(odd_days)
+        
+        category = "AFASTADAS / OUTROS"
+        is_diurno = (t in ['D', 'M', 'T'])
+        is_noturno = (t == 'N')
+        
+        if count_even > count_odd:
+            category = "PLANTÃO DIURNO PAR" if is_diurno else "PLANTÃO NOTURNO PAR"
+        elif count_odd > count_even:
+            category = "PLANTÃO DIURNO ÍMPAR" if is_diurno else "PLANTÃO NOTURNO ÍMPAR"
+        else:
+            # Se não tiver plantões definidos ainda, usa o padrão do cadastro para tentar agrupar, ou joga em Outros
+            if count_even > 0: # Tem plantões mas empatou
+                 category = "PLANTÃO DIURNO PAR" if is_diurno else "PLANTÃO NOTURNO PAR"
+            else:
+                 category = "AFASTADAS / OUTROS"
+
+        horario = "07:00 - 19:00" if is_diurno else "19:00 - 07:00"
+        role_map = {'nurse': 1, 'technician': 2, 'condutor': 3}
+        role_sort = role_map.get(u.role, 4)
+
+        groups_data[category].append({
+            "name": u.nome, "user_id": u.id, "matricula": u.matricula,
+            "role_label": getattr(u, "role_label", u.role),
+            "cells": u_cells, "horario": horario, "role_sort": role_sort
+        })
+
+    rows = []
+    group_order = ["PLANTÃO DIURNO PAR", "PLANTÃO DIURNO ÍMPAR", "PLANTÃO NOTURNO PAR", "PLANTÃO NOTURNO ÍMPAR", "AFASTADAS / OUTROS"]
+    
+    for title in group_order:
+        members = groups_data.get(title, [])
+        if members:
+            members.sort(key=lambda x: (x['role_sort'], x['name']))
+            rows.append({"title": title, "members": members})
+
+    prev_ano, prev_mes, next_ano, next_mes = _month_nav(ano, mes)
+
+    return render_template(
+        "nursing/scale_editor.html", 
+        title=f"Escala • {month_name(mes)} {ano}",
+        ano=ano, mes=mes, days=days,
+        prev_ano=prev_ano, prev_mes=prev_mes, next_ano=next_ano, next_mes=next_mes,
+        active_sector=sector, active_sector_id=sector_id,
+        schedule_id=sched.id, status=sched.status,
+        rows=rows
+    )
+
+# ---------------------------------------------------------------------
+# VISUALIZAÇÃO MENSAL (READ-ONLY)
+# ---------------------------------------------------------------------
+@bp.route("/monthly", methods=["GET"])
+@login_required
+def monthly_page():
+    # ✅ RESTAURADO: Busca dados reais para preencher o template monthly_view.html
+    
+    sector_id = request.args.get("sector_id", type=int)
+    ano = request.args.get("ano", type=int, default=date.today().year)
+    mes = request.args.get("mes", type=int, default=date.today().month)
+    q = request.args.get("q", "").strip()
+
+    # 1. Busca setores para as abas
+    sectors = Sector.query.filter_by(active=True).order_by(Sector.name.asc()).all()
+    
+    # Se não tem setor selecionado, pega o primeiro
+    if not sector_id and sectors:
+        sector_id = sectors[0].id
+    
+    active_sector = Sector.query.get(sector_id) if sector_id else None
+    
+    # 2. Busca a escala do setor/mês
+    schedule = NursingMonthlySchedule.query.filter_by(sector_id=sector_id, year=ano, month=mes).first()
+
+    professionals = []
+    cell_map = {} 
+
+    if active_sector:
+        # Busca usuários do setor
+        query = User.query.filter_by(sector_id=sector_id, status='active')
+        if q:
+            query = query.filter((User.nome.ilike(f"%{q}%")) | (User.matricula.ilike(f"%{q}%")))
+        professionals = query.order_by(User.nome.asc()).all()
+
+        if schedule and professionals:
+            user_ids = [p.id for p in professionals]
+            cells = NursingMonthlyCell.query.filter(
+                NursingMonthlyCell.schedule_id == schedule.id,
+                NursingMonthlyCell.planned_user_id.in_(user_ids)
+            ).all()
+            for c in cells:
+                if c.planned_user_id not in cell_map: cell_map[c.planned_user_id] = {}
+                cell_map[c.planned_user_id][c.day] = c.shift
+
+    days = _build_days(ano, mes)
+    prev_ano, prev_mes, next_ano, next_mes = _month_nav(ano, mes)
+    month_label = month_name(mes)
+
+    return render_template(
+        "nursing/monthly_view.html", # Seu template original
+        active_sector=active_sector, active_sector_id=sector_id, sectors=sectors,
+        ano=ano, mes=mes, month_label=month_label,
+        prev_ano=prev_ano, prev_mes=prev_mes, next_ano=next_ano, next_mes=next_mes,
+        q=q, days=days, professionals=professionals, cell_map=cell_map,
+        unidade_nome="Hospital Geral"
+    )
+
+# ==========================================
+# APIS JSON
+# ==========================================
+
+@bp.get("/api/users/search")
+@login_required
+def api_search_users():
+    q = request.args.get("q", "").strip()
+    if not q: return jsonify({"items": []})
+    users = User.query.filter((User.nome.ilike(f"%{q}%")) | (User.matricula.ilike(f"%{q}%"))).filter_by(status='active').limit(10).all()
+    return jsonify({"items": [{
+        "id": u.id, "name": u.nome, "matricula": u.matricula, "role_label": getattr(u, "role_label", u.role), "turno": u.turno
+    } for u in users]})
+
+@bp.get("/api/monthly/<int:schedule_id>/preview_import")
+@login_required
+def api_preview_import(schedule_id):
+    sched = NursingMonthlySchedule.query.get_or_404(schedule_id)
+    all_users = User.query.filter_by(sector_id=sched.sector_id, status='active').all()
+    current_members = [m.user_id for m in NursingMonthlyMember.query.filter_by(schedule_id=sched.id).all()]
+    
+    missing = []
+    for u in all_users:
+        if u.id not in current_members:
+            missing.append({
+                "id": u.id, "name": u.nome, "role": getattr(u, "role_label", u.role), "turno": u.turno or "?"
+            })
+    missing.sort(key=lambda x: x['name'])
+    return jsonify({"count": len(missing), "users": missing})
+
+@bp.post("/api/monthly/<int:schedule_id>/import_all")
+@exempt_csrf
+@login_required
+def api_import_all(schedule_id):
+    sched = NursingMonthlySchedule.query.get_or_404(schedule_id)
+    data = request.get_json(silent=True) or {}
+    
+    pattern = data.get("pattern", "odd") 
+    user_ids = data.get('user_ids', [])
+    
+    count = 0
+    if user_ids:
+        for uid in user_ids:
+            exists = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, user_id=uid).first()
+            if not exists:
+                db.session.add(NursingMonthlyMember(schedule_id=sched.id, user_id=uid, active=True))
+                _auto_fill_user_month(sched.id, uid, sched.year, sched.month, pattern=pattern)
+                count += 1
+        db.session.commit()
+        
+    return jsonify({"success": True, "imported": count})
+
+@bp.post("/api/monthly/<int:schedule_id>/add_user_auto")
+@exempt_csrf
+@login_required
+def api_add_user(schedule_id):
+    data = request.get_json(silent=True) or {}
+    uid = data.get("user_id")
+    pattern = data.get("pattern", "odd")
+    
+    if not uid: return jsonify({"error": "ID invalido"}), 400
+    
+    exists = NursingMonthlyMember.query.filter_by(schedule_id=schedule_id, user_id=uid).first()
+    if not exists:
+        db.session.add(NursingMonthlyMember(schedule_id=schedule_id, user_id=uid, active=True))
+        db.session.commit()
+    
+    sched = NursingMonthlySchedule.query.get(schedule_id)
+    _auto_fill_user_month(schedule_id, uid, sched.year, sched.month, pattern=pattern)
+    db.session.commit()
+    return jsonify({"success": True})
+
+@bp.post("/api/monthly/<int:schedule_id>/remove_member")
+@exempt_csrf
+@login_required
+def api_remove_member(schedule_id):
+    data = request.get_json(silent=True) or {}
+    uid = data.get("user_id")
+    if not uid: return jsonify({"error": "ID invalido"}), 400
+    
+    NursingMonthlyCell.query.filter_by(schedule_id=schedule_id, planned_user_id=uid).delete()
+    NursingMonthlyMember.query.filter_by(schedule_id=schedule_id, user_id=uid).delete()
+    db.session.commit()
+    return jsonify({"success": True})
+
+@bp.post("/api/monthly/<int:schedule_id>/cell")
+@exempt_csrf
+@login_required
+def api_update_cell(schedule_id):
+    data = request.get_json(silent=True) or {}
+    uid = data.get("user_id")
+    day = data.get("day")
+    shift = data.get("shift", "").strip().upper()
+    
+    cell = NursingMonthlyCell.query.filter_by(schedule_id=schedule_id, planned_user_id=uid, day=day).first()
+    if cell:
+        cell.shift = shift
+    else:
+        db.session.add(NursingMonthlyCell(schedule_id=schedule_id, planned_user_id=uid, day=day, shift=shift))
+    db.session.commit()
+    return jsonify({"success": True})
+
+# ==========================================
+# ESCALA DIÁRIA
+# ==========================================
+@bp.route("/daily", methods=["GET", "POST"])
+@login_required
+def daily():
+    # Mantém a rota para não quebrar links, mas sem lógica pesada se não for usada agora
+    return render_template("nursing/daily.html", daily_list=[], current_date=date.today(), sectors=[])
+
+@bp.get("/daily-page")
+@login_required
+def daily_page():
+    return redirect(url_for("nursing_ui.daily"))

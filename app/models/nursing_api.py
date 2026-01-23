@@ -1,155 +1,158 @@
 ﻿from __future__ import annotations
 
-import calendar
-from datetime import datetime, date
-
+import calendar  # Adicionado para corrigir erro no _autofill_cells
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
+from sqlalchemy import or_
 
-from ..extensions import db
-from ..models import (
-    Sector, User,
-    NursingMonthlySchedule, NursingMonthlyMember, NursingMonthlyCell, NursingDailyOverride
+from app.extensions import db
+from app.models import (
+    User,
+    Sector,
+    NursingMonthlySchedule,
+    NursingMonthlyMember,
+    NursingMonthlyCell,
 )
 
 bp = Blueprint("nursing_api", __name__, url_prefix="/api/nursing")
 
 
-# ==========================
-# Constantes / Nomenclaturas
-# ==========================
-
-# status do dia na escala diária (override)
-DAY_STATUS = {"OK", "FALTA", "ATESTADO", "TROCA", "REMANEJADO", "EXTRA", "PENDENTE"}
-
-# shifts válidos no seu modelo mensal (NÃO coloque F/FE/AT aqui; isso é status/motivo, não turno)
-VALID_SHIFTS = {"D", "N", "M", "T", "MT"}
-
-# padrões de trabalho para auto-preenchimento mensal
-# (você pode renomear como quiser, mas esses são bem claros)
-WORK_PATTERNS = {
-    "12X36_D_IMPAR",
-    "12X36_D_PAR",
-    "12X36_N_IMPAR",
-    "12X36_N_PAR",
-    "MT_M",   # seg-sex manhã
-    "MT_T",   # seg-sex tarde
-}
-
-
-# ==========================
+# =========================
 # Helpers
-# ==========================
+# =========================
+ACTIVE_STATUSES = {"active", "ativo", "approved"}
+
 
 def _require_manager() -> bool:
     return getattr(current_user, "role", "") in ("manager", "admin")
 
 
-def _days_in_month(year: int, month: int) -> int:
-    return calendar.monthrange(year, month)[1]
+def _get_schedule_or_404(schedule_id: int):
+    sched = NursingMonthlySchedule.query.get(int(schedule_id))
+    if not sched:
+        return None, (jsonify({"error": "Escala não encontrada"}), 404)
+    return sched, None
 
 
-def _is_weekday(year: int, month: int, day: int) -> bool:
-    # 0=segunda ... 6=domingo
-    return date(year, month, day).weekday() <= 4
+def _is_locked(schedule: NursingMonthlySchedule) -> bool:
+    """Verifica se a escala está fechada/publicada."""
+    if hasattr(schedule, "is_published") and bool(getattr(schedule, "is_published")):
+        return True
+    if hasattr(schedule, "status") and (getattr(schedule, "status") == "published"):
+        return True
+    return False
 
 
-def _pattern_should_work(pattern: str, year: int, month: int, day: int) -> tuple[bool, str | None]:
+def _apply_active_filter(query):
+    """Filtra usuários ativos sem quebrar quando o campo/status variar."""
+    if hasattr(User, "status"):
+        try:
+            query = query.filter(User.status.in_(list(ACTIVE_STATUSES)))
+        except Exception:
+            pass
+    return query
+
+
+def _user_sector_field_name() -> str | None:
+    cols = {c.name for c in getattr(User, "__table__").columns}
+    if "sector_id" in cols:
+        return "sector_id"
+    if "setor_id" in cols:
+        return "setor_id"
+    if "setor" in cols:
+        return "setor"
+    return None
+
+
+def _schedule_status_field_name() -> str | None:
+    cols = {c.name for c in getattr(NursingMonthlySchedule, "__table__").columns}
+    if "status" in cols:
+        return "status"
+    return None
+
+
+def _cell_find_or_create(schedule_id: int, day: int, member_id: int | None, user_id: int | None):
     """
-    Retorna (trabalha_hoje, shift_hoje)
-    Se não trabalha, shift vem None.
+    Tenta localizar uma célula de escala de forma tolerante.
     """
-    pattern = (pattern or "").strip().upper()
+    q = NursingMonthlyCell.query.filter_by(schedule_id=schedule_id, day=day)
+    cols = {c.name for c in getattr(NursingMonthlyCell, "__table__").columns}
 
-    # 12x36: trabalha alternado pelo número do dia (ímpar/par)
-    if pattern == "12X36_D_IMPAR":
-        return (day % 2 == 1, "D")
-    if pattern == "12X36_D_PAR":
-        return (day % 2 == 0, "D")
-    if pattern == "12X36_N_IMPAR":
-        return (day % 2 == 1, "N")
-    if pattern == "12X36_N_PAR":
-        return (day % 2 == 0, "N")
+    if member_id and "member_id" in cols:
+        q = q.filter_by(member_id=member_id)
+    elif user_id:
+        if "user_id" in cols:
+            q = q.filter_by(user_id=user_id)
+        elif "planned_user_id" in cols:
+            q = q.filter_by(planned_user_id=user_id)
 
-    # MT: seg-sex
-    if pattern == "MT_M":
-        return (_is_weekday(year, month, day), "M")
-    if pattern == "MT_T":
-        return (_is_weekday(year, month, day), "T")
+    cell = q.first()
+    if cell:
+        return cell
 
-    # se vier vazio/desconhecido, não preenche nada automaticamente
-    return (False, None)
+    # cria novo
+    cell = NursingMonthlyCell(schedule_id=schedule_id, day=day)
+
+    if member_id and "member_id" in cols:
+        setattr(cell, "member_id", member_id)
+    elif user_id:
+        if "user_id" in cols:
+            setattr(cell, "user_id", user_id)
+        elif "planned_user_id" in cols:
+            setattr(cell, "planned_user_id", user_id)
+
+    db.session.add(cell)
+    return cell
 
 
-def _apply_pattern_to_monthly_cells(
-    sched: NursingMonthlySchedule,
-    role: str,
-    position: int,
-    user_id: int,
-    pattern: str,
-) -> None:
-    """
-    Gera/atualiza células do mês para a combinação (role, position) preenchendo planned_user_id
-    nos dias em que trabalha, e removendo (setando None) nos dias em que não trabalha.
+def _autofill_cells(schedule: NursingMonthlySchedule, user: User):
+    """Preenche D ou N em TODOS os dias do mês baseado no turno do usuário."""
+    try:
+        days_in_month = calendar.monthrange(schedule.year, schedule.month)[1]
+    except Exception:
+        return # Evita erro se year/month invalidos
 
-    Mantém seu modelo atual: NursingMonthlyCell(day, shift, role, position -> planned_user_id)
-    """
-    year, month = sched.year, sched.month
-    dim = _days_in_month(year, month)
+    turno = (getattr(user, "turno", "") or "").strip().lower()
+    shift = "D" if "di" in turno else ("N" if "no" in turno else "")
 
-    # busca todas as células do mês desta "linha"
-    cells = NursingMonthlyCell.query.filter_by(
-        schedule_id=sched.id,
-        role=role,
-        position=position,
-    ).all()
+    if not shift:
+        return
 
-    # index por dia para facilitar
-    # OBS: como shift pode variar por dia, index por (day, shift)
-    idx = {(c.day, c.shift): c for c in cells}
+    # Procura coluna correta (user_id vs planned_user_id)
+    cols = {c.name for c in getattr(NursingMonthlyCell, "__table__").columns}
+    user_fk_field = "user_id" if "user_id" in cols else "planned_user_id"
 
-    for day in range(1, dim + 1):
-        works, sh = _pattern_should_work(pattern, year, month, day)
+    for day in range(1, days_in_month + 1):
+        # Busca célula existente
+        criteria = {
+            "schedule_id": schedule.id,
+            "day": day,
+            user_fk_field: user.id
+        }
+        cell = NursingMonthlyCell.query.filter_by(**criteria).first()
 
-        if works and sh:
-            # garante célula do dia+shift preenchida com o user_id
-            c = idx.get((day, sh))
-            if not c:
-                c = NursingMonthlyCell(
-                    schedule_id=sched.id,
-                    day=day,
-                    shift=sh,
-                    role=role,
-                    position=position,
-                    planned_user_id=user_id,
-                )
-                db.session.add(c)
-            else:
-                c.planned_user_id = user_id
-
-            # se existirem células no mesmo day com outros shifts por causa de edição antiga, limpe:
-            for other_shift in list(VALID_SHIFTS):
-                if other_shift != sh:
-                    oc = idx.get((day, other_shift))
-                    if oc and oc.planned_user_id == user_id:
-                        oc.planned_user_id = None
-
+        if cell:
+            if hasattr(cell, "shift"):
+                cell.shift = shift
         else:
-            # não trabalha: se tiver célula com esse user_id, limpa
-            for sh2 in VALID_SHIFTS:
-                c2 = idx.get((day, sh2))
-                if c2 and c2.planned_user_id == user_id:
-                    c2.planned_user_id = None
+            new_cell = NursingMonthlyCell(schedule_id=schedule.id, day=day)
+            setattr(new_cell, user_fk_field, user.id)
+            if hasattr(new_cell, "shift"):
+                new_cell.shift = shift
+            db.session.add(new_cell)
 
 
-# ==========================
-# Setores
-# ==========================
-
+# =========================
+# Sectors
+# =========================
 @bp.get("/sectors")
 @login_required
 def list_sectors():
-    sectors = Sector.query.filter_by(active=True).order_by(Sector.name.asc()).all()
+    q = Sector.query
+    if hasattr(Sector, "active"):
+        q = q.filter(Sector.active == True)  # noqa: E712
+    q = q.order_by(Sector.name.asc())
+    sectors = q.all()
     return jsonify([{"id": s.id, "name": s.name} for s in sectors])
 
 
@@ -159,426 +162,487 @@ def create_sector():
     if not _require_manager():
         return jsonify({"error": "Sem permissão"}), 403
 
-    data = request.get_json(force=True) or {}
+    data = request.get_json(silent=True) or {}
     name = (data.get("name") or "").strip()
     if not name:
-        return jsonify({"error": "Nome do setor é obrigatório"}), 400
+        return jsonify({"error": "name obrigatório"}), 400
 
-    exists = Sector.query.filter_by(name=name).first()
-    if exists:
-        return jsonify({"error": "Setor já existe"}), 409
-
-    s = Sector(name=name, active=True)
+    s = Sector(name=name)
+    if hasattr(Sector, "active"):
+        setattr(s, "active", True)
     db.session.add(s)
     db.session.commit()
-    return jsonify({"id": s.id, "name": s.name})
+    return jsonify({"ok": True, "id": s.id, "name": s.name})
 
 
-# ==========================
-# Escala Mensal
-# ==========================
+# =========================
+# Monthly schedule
+# =========================
+@bp.get("/monthly")
+@login_required
+def monthly_list():
+    year = int(request.args.get("year") or 0)
+    month = int(request.args.get("month") or 0)
+
+    q = NursingMonthlySchedule.query
+    if year:
+        q = q.filter_by(year=year)
+    if month:
+        q = q.filter_by(month=month)
+
+    q = q.order_by(NursingMonthlySchedule.id.asc())
+    rows = q.all()
+
+    out = []
+    for s in rows:
+        sec = Sector.query.get(getattr(s, "sector_id", None)) if getattr(s, "sector_id", None) else None
+        out.append({
+            "id": s.id,
+            "year": getattr(s, "year", None),
+            "month": getattr(s, "month", None),
+            "sector_id": getattr(s, "sector_id", None),
+            "sector_name": sec.name if sec else None,
+            "status": getattr(s, _schedule_status_field_name() or "status", None) if _schedule_status_field_name() else None,
+        })
+    return jsonify({"items": out})
+
 
 @bp.post("/monthly")
 @login_required
-def create_or_get_monthly():
-    """Gerência cria (ou busca) escala mensal por setor/ano/mês."""
+def monthly_create():
     if not _require_manager():
         return jsonify({"error": "Sem permissão"}), 403
 
-    data = request.get_json(force=True) or {}
-    sector_id = int(data.get("sector_id") or 0)
+    data = request.get_json(silent=True) or {}
     year = int(data.get("year") or 0)
     month = int(data.get("month") or 0)
+    sector_id = int(data.get("sector_id") or 0)
 
-    if not sector_id or year < 2000 or month < 1 or month > 12:
-        return jsonify({"error": "sector_id/ano/mês inválidos"}), 400
+    if not (year and month and sector_id):
+        return jsonify({"error": "year, month, sector_id obrigatórios"}), 400
 
-    sched = NursingMonthlySchedule.query.filter_by(
-        sector_id=sector_id, year=year, month=month
-    ).first()
+    existing = NursingMonthlySchedule.query.filter_by(year=year, month=month, sector_id=sector_id).first()
+    if existing:
+        return jsonify({"ok": True, "id": existing.id, "already": True})
 
-    if not sched:
-        sched = NursingMonthlySchedule(
-            sector_id=sector_id,
-            year=year,
-            month=month,
-            status="draft",
-            created_by_id=getattr(current_user, "id", None),
-        )
-        db.session.add(sched)
-        db.session.commit()
+    s = NursingMonthlySchedule(year=year, month=month, sector_id=sector_id)
+    status_field = _schedule_status_field_name()
+    if status_field:
+        setattr(s, status_field, "draft")
 
-    return jsonify({
-        "id": sched.id,
-        "sector_id": sched.sector_id,
-        "year": sched.year,
-        "month": sched.month,
-        "status": sched.status,
-    })
+    db.session.add(s)
+    db.session.commit()
+    return jsonify({"ok": True, "id": s.id})
 
 
 @bp.get("/monthly/<int:schedule_id>")
 @login_required
-def get_monthly(schedule_id: int):
-    """
-    Retorna estrutura para montar a grade:
-    - dias do mês
-    - membros (linhas)
-    - células planejadas
-    """
-    sched = NursingMonthlySchedule.query.get_or_404(schedule_id)
-    sector = Sector.query.get(sched.sector_id)
+def monthly_get(schedule_id: int):
+    sched, err = _get_schedule_or_404(schedule_id)
+    if err:
+        return err
 
-    if getattr(current_user, "role", "") not in ("manager", "admin") and sched.status != "published":
-        return jsonify({"error": "Escala não publicada"}), 403
-
-    days_in_month = _days_in_month(sched.year, sched.month)
-
-    members = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, active=True).all()
-    cells = NursingMonthlyCell.query.filter_by(schedule_id=sched.id).all()
-
-    member_rows = []
-    for m in sorted(members, key=lambda x: (x.role, x.position)):
-        u = User.query.get(m.user_id)
-        member_rows.append({
-            "id": m.id,
-            "user_id": m.user_id,
-            "name": u.nome if u else f"User {m.user_id}",
-            "role": m.role,
-            "position": m.position,
-            # NOVO: padrão para UI saber e desenhar "F" nos dias que não tem célula
-            "work_pattern": getattr(m, "work_pattern", None),
-            "matricula": getattr(u, "matricula", None) if u else None,
-        })
-
-    # mantém seu formato atual de cells (para não quebrar o front que já usa isso)
-    cell_map: dict[str, int | None] = {}
-    for c in cells:
-        key = f"{c.day}:{c.shift}:{c.role}:{c.position}"
-        cell_map[key] = c.planned_user_id
+    sec = Sector.query.get(getattr(sched, "sector_id", None)) if getattr(sched, "sector_id", None) else None
+    status_field = _schedule_status_field_name()
 
     return jsonify({
-        "schedule": {
-            "id": sched.id,
-            "sector": {"id": sector.id, "name": sector.name} if sector else None,
-            "year": sched.year,
-            "month": sched.month,
-            "status": sched.status,
-            "days_in_month": days_in_month,
-        },
-        "members": member_rows,
-        "cells": cell_map,
+        "id": sched.id,
+        "year": getattr(sched, "year", None),
+        "month": getattr(sched, "month", None),
+        "sector_id": getattr(sched, "sector_id", None),
+        "sector_name": sec.name if sec else None,
+        "status": getattr(sched, status_field, None) if status_field else None,
+        "is_locked": _is_locked(sched)
     })
 
 
-@bp.post("/monthly/<int:schedule_id>/members")
+# =========================
+# Members
+# =========================
+@bp.route("/monthly/<int:schedule_id>/members", methods=["GET", "POST", "DELETE"])
 @login_required
-def upsert_member(schedule_id: int):
-    """
-    Gerência: adiciona colaborador como linha da grade (role + position)
-    e (NOVO) aplica padrão de trabalho preenchendo o mês automaticamente.
-    """
+def monthly_members(schedule_id: int):
+    sched, err = _get_schedule_or_404(schedule_id)
+    if err:
+        return err
+
+    if request.method == "GET":
+        members = (NursingMonthlyMember.query
+                   .filter_by(schedule_id=sched.id)
+                   .order_by(NursingMonthlyMember.position.asc(), NursingMonthlyMember.id.asc())
+                   .all())
+
+        items = []
+        for m in members:
+            u = User.query.get(getattr(m, "user_id", None)) if getattr(m, "user_id", None) else None
+            items.append({
+                "member_id": m.id,
+                "user_id": getattr(m, "user_id", None),
+                "name": getattr(u, "nome", None) if u else None,
+                "matricula": getattr(u, "matricula", None) if u else None,
+                "role": getattr(m, "role", None),
+                "active": getattr(m, "active", True),
+                "position": getattr(m, "position", None),
+                "sector_id": getattr(u, "sector_id", None) if u else None,
+            })
+        return jsonify({"items": items})
+
+    # POST/DELETE exigem manager
     if not _require_manager():
         return jsonify({"error": "Sem permissão"}), 403
 
-    sched = NursingMonthlySchedule.query.get_or_404(schedule_id)
-    if sched.status != "draft":
-        return jsonify({"error": "Escala não está em rascunho"}), 400
+    if _is_locked(sched):
+        return jsonify({"error": "Escala fechada/publicada"}), 409
 
-    data = request.get_json(force=True) or {}
+    data = request.get_json(silent=True) or {}
 
+    if request.method == "POST":
+        user_id = int(data.get("user_id") or 0)
+        if not user_id:
+            return jsonify({"error": "user_id obrigatório"}), 400
+
+        u = User.query.get(user_id)
+        if not u:
+            return jsonify({"error": "Usuário não encontrado"}), 404
+
+        exists = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, user_id=user_id).first()
+        if exists:
+            return jsonify({"ok": True, "already": True})
+
+        m = NursingMonthlyMember(
+            schedule_id=sched.id,
+            user_id=user_id,
+            role=getattr(u, "role", "staff"),
+            position=9999,
+            active=True
+        )
+        db.session.add(m)
+        db.session.commit()
+        return jsonify({"ok": True, "member_id": m.id})
+
+    # DELETE
+    member_id = int(data.get("member_id") or 0)
+    if not member_id:
+        return jsonify({"error": "member_id obrigatório"}), 400
+
+    m = NursingMonthlyMember.query.filter_by(id=member_id, schedule_id=sched.id).first()
+    if not m:
+        return jsonify({"error": "Membro não encontrado"}), 404
+
+    db.session.delete(m)
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
+# =========================
+# Cell edit
+# =========================
+@bp.post("/monthly/<int:schedule_id>/cell")
+@login_required
+def monthly_cell_set(schedule_id: int):
+    if not _require_manager():
+        return jsonify({"error": "Sem permissão"}), 403
+
+    sched, err = _get_schedule_or_404(schedule_id)
+    if err:
+        return err
+    
+    if _is_locked(sched):
+        return jsonify({"error": "Escala fechada/publicada"}), 409
+
+    data = request.get_json(silent=True) or {}
+    day = int(data.get("day") or 0)
+    code = (data.get("code") or "").strip()
+    member_id = int(data.get("member_id") or 0) or None
+    user_id = int(data.get("user_id") or 0) or None
+
+    if not day:
+        return jsonify({"error": "day obrigatório"}), 400
+
+    cols = {c.name for c in getattr(NursingMonthlyCell, "__table__").columns}
+    code_field = "code" if "code" in cols else ("value" if "value" in cols else None)
+
+    cell = _cell_find_or_create(sched.id, day, member_id, user_id)
+    if code_field:
+        setattr(cell, code_field, code)
+
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
+# =========================
+# Publish
+# =========================
+@bp.post("/monthly/<int:schedule_id>/publish")
+@login_required
+def monthly_publish(schedule_id: int):
+    if not _require_manager():
+        return jsonify({"error": "Sem permissão"}), 403
+
+    sched, err = _get_schedule_or_404(schedule_id)
+    if err:
+        return err
+
+    status_field = _schedule_status_field_name()
+    if status_field:
+        setattr(sched, status_field, "published")
+    elif hasattr(sched, "is_published"):
+        setattr(sched, "is_published", True)
+
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
+# =========================
+# DAILY
+# =========================
+@bp.get("/daily")
+@login_required
+def daily_get():
+    return jsonify({"ok": True})
+
+
+@bp.post("/daily/override")
+@login_required
+def daily_override():
+    if not _require_manager():
+        return jsonify({"error": "Sem permissão"}), 403
+    return jsonify({"ok": True})
+
+
+# =========================
+# Search & Utils
+# =========================
+@bp.get("/users/search")
+@login_required
+def users_search():
+    q = (request.args.get("q") or "").strip().lower()
+    if not q:
+        return jsonify({"items": []})
+
+    query = _apply_active_filter(User.query)
+    conds = []
+    if hasattr(User, "nome"):
+        conds.append(User.nome.ilike(f"%{q}%"))
+    if hasattr(User, "matricula"):
+        conds.append(User.matricula.ilike(f"%{q}%"))
+
+    if conds:
+        query = query.filter(or_(*conds))
+
+    if hasattr(User, "nome"):
+        query = query.order_by(User.nome.asc())
+
+    users = query.limit(30).all()
+    items = []
+    for u in users:
+        sec_id = getattr(u, "sector_id", None)
+        sec_name = None
+        if sec_id:
+            sec = Sector.query.get(sec_id)
+            sec_name = sec.name if sec else None
+
+        items.append({
+            "id": u.id,
+            "name": getattr(u, "nome", None),
+            "matricula": getattr(u, "matricula", None),
+            "sector_id": sec_id,
+            "sector_name": sec_name,
+            "turno": getattr(u, "turno", None),
+            "role_label": getattr(u, "role", None),
+        })
+
+    return jsonify({"items": items})
+
+
+@bp.post("/monthly/<int:schedule_id>/add_user_auto")
+@login_required
+def add_user_auto(schedule_id: int):
+    if not _require_manager():
+        return jsonify({"error": "Sem permissão"}), 403
+
+    sched, err = _get_schedule_or_404(schedule_id)
+    if err:
+        return err
+        
+    if _is_locked(sched):
+        return jsonify({"error": "Escala fechada"}), 409
+
+    data = request.get_json(silent=True) or {}
     user_id = int(data.get("user_id") or 0)
-    role = (data.get("role") or "").strip().lower()  # tecnico / enfermeiro
-    position = int(data.get("position") or 0)
-
-    # NOVO: padrão de trabalho para auto-preencher
-    work_pattern = (data.get("work_pattern") or "").strip().upper() or None
-    if work_pattern and work_pattern not in WORK_PATTERNS:
-        return jsonify({
-            "error": "work_pattern inválido",
-            "allowed": sorted(WORK_PATTERNS)
-        }), 400
-
-    if not user_id or role not in ("tecnico", "enfermeiro") or position <= 0:
-        return jsonify({"error": "Dados inválidos"}), 400
+    if not user_id:
+        return jsonify({"error": "user_id obrigatório"}), 400
 
     u = User.query.get(user_id)
     if not u:
         return jsonify({"error": "Usuário não encontrado"}), 404
 
-    m = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, user_id=user_id).first()
+    exists = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, user_id=u.id).first()
+    if exists:
+        return jsonify({"ok": True, "already": True})
 
-    if not m:
-        m = NursingMonthlyMember(
-            schedule_id=sched.id,
-            user_id=user_id,
-            role=role,
-            position=position,
-            active=True,
-        )
-        # se seu model tiver essa coluna, ok; se não tiver, você cria a migração
-        if hasattr(m, "work_pattern"):
-            m.work_pattern = work_pattern
-        db.session.add(m)
-    else:
-        m.role = role
-        m.position = position
-        m.active = True
-        if hasattr(m, "work_pattern") and work_pattern:
-            m.work_pattern = work_pattern
-
-    db.session.flush()  # garante m.id sem commit ainda
-
-    # aplica padrão no mês (auto preenche)
-    pattern_to_use = work_pattern
-    if hasattr(m, "work_pattern"):
-        pattern_to_use = m.work_pattern or work_pattern
-
-    if pattern_to_use:
-        _apply_pattern_to_monthly_cells(
-            sched=sched,
-            role=role,
-            position=position,
-            user_id=user_id,
-            pattern=pattern_to_use,
-        )
-
-    db.session.commit()
-    return jsonify({"ok": True})
-
-
-@bp.post("/monthly/<int:schedule_id>/cell")
-@login_required
-def set_monthly_cell(schedule_id: int):
-    """
-    Gerência: define célula planejada
-    (dia + turno + role + position -> planned_user_id).
-
-    OBS:
-      - Aqui é "manual", por clique.
-      - Motivos (atestado/falta/licença) devem ir para o DAILY override.
-    """
-    if not _require_manager():
-        return jsonify({"error": "Sem permissão"}), 403
-
-    sched = NursingMonthlySchedule.query.get_or_404(schedule_id)
-    if sched.status != "draft":
-        return jsonify({"error": "Escala não está em rascunho"}), 400
-
-    data = request.get_json(force=True) or {}
-    day = int(data.get("day") or 0)
-    shift = (data.get("shift") or "").strip().upper()
-    role = (data.get("role") or "").strip().lower()
-    position = int(data.get("position") or 0)
-
-    planned_user_id = data.get("planned_user_id")
-    planned_user_id = int(planned_user_id) if planned_user_id else None
-
-    dim = _days_in_month(sched.year, sched.month)
-    if day < 1 or day > dim:
-        return jsonify({"error": "Dia inválido"}), 400
-    if shift not in VALID_SHIFTS:
-        return jsonify({"error": "Turno inválido"}), 400
-    if role not in ("tecnico", "enfermeiro"):
-        return jsonify({"error": "Role inválida"}), 400
-    if position <= 0:
-        return jsonify({"error": "Posição inválida"}), 400
-
-    if planned_user_id:
-        u = User.query.get(planned_user_id)
-        if not u:
-            return jsonify({"error": "planned_user_id não encontrado"}), 404
-
-    cell = NursingMonthlyCell.query.filter_by(
+    db.session.add(NursingMonthlyMember(
         schedule_id=sched.id,
-        day=day,
-        shift=shift,
-        role=role,
-        position=position,
-    ).first()
-
-    if not cell:
-        cell = NursingMonthlyCell(
-            schedule_id=sched.id,
-            day=day,
-            shift=shift,
-            role=role,
-            position=position,
-            planned_user_id=planned_user_id,
-        )
-        db.session.add(cell)
-    else:
-        cell.planned_user_id = planned_user_id
-
+        user_id=u.id,
+        role=getattr(u, "role", "staff"),
+        position=9999,
+        active=True
+    ))
     db.session.commit()
+    
+    # Opcional: preencher turno automatico
+    # _autofill_cells(sched, u) 
+    # db.session.commit()
+
     return jsonify({"ok": True})
 
 
-@bp.post("/monthly/<int:schedule_id>/publish")
+@bp.post("/transfer")
 @login_required
-def publish_monthly(schedule_id: int):
+def transfer_user_between_sectors():
+    """
+    Remove de outras escalas do mesmo mês e adiciona na atual.
+    Verifica se a escala destino está travada.
+    """
     if not _require_manager():
         return jsonify({"error": "Sem permissão"}), 403
 
-    sched = NursingMonthlySchedule.query.get_or_404(schedule_id)
-    sched.status = "published"
-    sched.published_at = datetime.utcnow()
-    sched.published_by_id = getattr(current_user, "id", None)
+    data = request.get_json(silent=True) or {}
+    user_id = int(data.get("user_id") or 0)
+    
+    # Suporta schedule_id OU (year, month, to_sector_id)
+    schedule_id = int(data.get("schedule_id") or 0)
+    year = int(data.get("year") or 0)
+    month = int(data.get("month") or 0)
+
+    if schedule_id:
+        sched = NursingMonthlySchedule.query.get(schedule_id)
+        if sched:
+            year = sched.year
+            month = sched.month
+    elif year and month and data.get("to_sector_id"):
+        # Tenta achar o schedule pelo setor
+        sched = NursingMonthlySchedule.query.filter_by(
+            year=year, month=month, sector_id=int(data.get("to_sector_id"))
+        ).first()
+    else:
+        sched = None
+
+    if not sched:
+        return jsonify({"error": "Escala destino não encontrada"}), 404
+        
+    if _is_locked(sched):
+        return jsonify({"error": "Escala publicada. Não pode transferir."}), 409
+
+    if not user_id:
+        return jsonify({"error": "user_id obrigatório"}), 400
+
+    # 1. Remove das outras do mesmo mês
+    other_schedules = NursingMonthlySchedule.query.filter_by(year=year, month=month).all()
+    removed_from = []
+    for osched in other_schedules:
+        if osched.id == sched.id:
+            continue
+            
+        # Se a outra estiver fechada, tecnicamente não deveria remover, 
+        # mas "transferência" implica sair de lá. 
+        # Vamos assumir que gerente pode tirar.
+
+        m = NursingMonthlyMember.query.filter_by(schedule_id=osched.id, user_id=user_id).first()
+        if m:
+            db.session.delete(m)
+            removed_from.append(osched.id)
+            
+            # Limpa células antigas
+            cols = {c.name for c in getattr(NursingMonthlyCell, "__table__").columns}
+            if "user_id" in cols:
+                NursingMonthlyCell.query.filter_by(schedule_id=osched.id, user_id=user_id).delete()
+            elif "planned_user_id" in cols:
+                NursingMonthlyCell.query.filter_by(schedule_id=osched.id, planned_user_id=user_id).delete()
+
+    # 2. Adiciona na nova (se não existir)
+    exists = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, user_id=user_id).first()
+    added_id = None
+    
+    if exists:
+        # Garante que está atualizado
+        added_id = exists.id
+    else:
+        u = User.query.get(user_id)
+        if not u:
+            return jsonify({"error": "Usuário não encontrado"}), 404
+
+        new_member = NursingMonthlyMember(
+            schedule_id=sched.id,
+            user_id=u.id,
+            role=getattr(u, "role", "staff"),
+            position=9999,
+            active=True
+        )
+        # Se tiver campo sector_id no membro
+        if hasattr(new_member, "sector_id") and hasattr(sched, "sector_id"):
+             setattr(new_member, "sector_id", sched.sector_id)
+             
+        db.session.add(new_member)
+        db.session.flush() # para ter ID
+        added_id = new_member.id
+        
+        # Opcional: autofill
+        # _autofill_cells(sched, u)
 
     db.session.commit()
-    return jsonify({"ok": True})
-
-
-# ==========================
-# Escala Diária (override)
-# ==========================
-
-@bp.get("/daily")
-@login_required
-def get_daily_view():
-    """
-    Retorna Escala Diária consolidada:
-    - pega plano mensal (cells do dia/turno)
-    - aplica override (daily_overrides) se houver
-    """
-    sector_id = int(request.args.get("sector_id") or 0)
-    dt_str = (request.args.get("date") or "").strip()
-    shift = (request.args.get("shift") or "").strip().upper()
-
-    if not sector_id or not dt_str or shift not in VALID_SHIFTS:
-        return jsonify({"error": "Parâmetros inválidos"}), 400
-
-    dt = date.fromisoformat(dt_str)
-
-    sched = NursingMonthlySchedule.query.filter_by(
-        sector_id=sector_id, year=dt.year, month=dt.month, status="published"
-    ).first()
-    if not sched:
-        return jsonify({"error": "Escala mensal não publicada para este setor/mês"}), 404
-
-    day = dt.day
-
-    monthly_cells = NursingMonthlyCell.query.filter_by(
-        schedule_id=sched.id, day=day, shift=shift
-    ).all()
-
-    overrides = NursingDailyOverride.query.filter_by(
-        sector_id=sector_id, date=dt, shift=shift
-    ).all()
-    ov_map = {(o.role, o.position): o for o in overrides}
-
-    rows = []
-    for c in sorted(monthly_cells, key=lambda x: (x.role, x.position)):
-        planned_u = User.query.get(c.planned_user_id) if c.planned_user_id else None
-        ov = ov_map.get((c.role, c.position))
-
-        if ov:
-            actual_u = User.query.get(ov.actual_user_id) if ov.actual_user_id else None
-            rows.append({
-                "role": c.role,
-                "position": c.position,
-                "planned_user": {"id": planned_u.id, "name": planned_u.nome} if planned_u else None,
-                "actual_user": {"id": actual_u.id, "name": actual_u.nome} if actual_u else None,
-                "status": ov.status,
-                "from_sector_id": ov.from_sector_id,
-                "extra_type": ov.extra_type,
-                "comp_day": ov.comp_day.isoformat() if ov.comp_day else None,
-                "notes": ov.notes,
-            })
-        else:
-            rows.append({
-                "role": c.role,
-                "position": c.position,
-                "planned_user": {"id": planned_u.id, "name": planned_u.nome} if planned_u else None,
-                "actual_user": None,
-                "status": "OK",
-                "from_sector_id": None,
-                "extra_type": None,
-                "comp_day": None,
-                "notes": None,
-            })
-
     return jsonify({
-        "schedule_id": sched.id,
-        "sector_id": sector_id,
-        "date": dt.isoformat(),
-        "shift": shift,
-        "rows": rows,
+        "ok": True, 
+        "removed_from": removed_from, 
+        "added_to": sched.id, 
+        "member_id": added_id
     })
 
 
-@bp.post("/daily/override")
+@bp.post("/monthly/<int:schedule_id>/import_sector")
 @login_required
-def set_daily_override():
-    """
-    Enfermeiro registra mudanças (dia):
-    - falta
-    - atestado pendente
-    - remanejamento
-    - extra/folga
-    """
-    data = request.get_json(force=True) or {}
+def import_sector(schedule_id: int):
+    if not _require_manager():
+        return jsonify({"error": "Sem permissão"}), 403
 
-    sector_id = int(data.get("sector_id") or 0)
-    dt = date.fromisoformat(data.get("date"))
-    shift = (data.get("shift") or "").strip().upper()
+    sched, err = _get_schedule_or_404(schedule_id)
+    if err:
+        return err
 
-    role = (data.get("role") or "").strip().lower()
-    position = int(data.get("position") or 0)
+    if _is_locked(sched):
+        return jsonify({"error": "Escala fechada"}), 409
 
-    status = (data.get("status") or "OK").strip().upper()
+    sector_id = getattr(sched, "sector_id", None)
+    if not sector_id:
+        return jsonify({"ok": True, "added": 0})
 
-    planned_user_id = data.get("planned_user_id")
-    planned_user_id = int(planned_user_id) if planned_user_id else None
+    q = _apply_active_filter(User.query)
+    sector_field = _user_sector_field_name()
+    
+    if sector_field == "sector_id":
+        q = q.filter(User.sector_id == sector_id)
+    elif sector_field == "setor_id":
+        q = q.filter(User.setor_id == sector_id)
+    elif sector_field == "setor":
+        sec = Sector.query.get(sector_id)
+        if sec:
+            q = q.filter(User.setor == sec.name)
 
-    actual_user_id = data.get("actual_user_id")
-    actual_user_id = int(actual_user_id) if actual_user_id else None
+    users = q.all()
+    added = 0
+    for u in users:
+        exists = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, user_id=u.id).first()
+        if exists:
+            continue
 
-    from_sector_id = data.get("from_sector_id")
-    from_sector_id = int(from_sector_id) if from_sector_id else None
-
-    extra_type = (data.get("extra_type") or "").strip().upper() or None
-    comp_day = data.get("comp_day")
-    comp_day = date.fromisoformat(comp_day) if comp_day else None
-
-    notes = (data.get("notes") or "").strip() or None
-
-    if not sector_id or shift not in VALID_SHIFTS:
-        return jsonify({"error": "Setor/turno inválidos"}), 400
-    if role not in ("tecnico", "enfermeiro") or position <= 0:
-        return jsonify({"error": "Role/posição inválidos"}), 400
-    if status not in DAY_STATUS:
-        return jsonify({"error": "Status inválido"}), 400
-
-    sched = NursingMonthlySchedule.query.filter_by(
-        sector_id=sector_id, year=dt.year, month=dt.month, status="published"
-    ).first()
-    if not sched:
-        return jsonify({"error": "Escala mensal não publicada para este setor/mês"}), 404
-
-    ov = NursingDailyOverride.query.filter_by(
-        sector_id=sector_id, date=dt, shift=shift, role=role, position=position
-    ).first()
-
-    if not ov:
-        ov = NursingDailyOverride(
+        db.session.add(NursingMonthlyMember(
             schedule_id=sched.id,
-            sector_id=sector_id,
-            date=dt,
-            shift=shift,
-            role=role,
-            position=position,
-            created_by_id=getattr(current_user, "id", None),
-        )
-        db.session.add(ov)
-
-    ov.planned_user_id = planned_user_id
-    ov.actual_user_id = actual_user_id
-    ov.status = status
-    ov.from_sector_id = from_sector_id
-    ov.extra_type = extra_type
-    ov.comp_day = comp_day
-    ov.notes = notes
+            user_id=u.id,
+            role=getattr(u, "role", "staff"),
+            position=9999,
+            active=True
+        ))
+        added += 1
 
     db.session.commit()
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "added": added})

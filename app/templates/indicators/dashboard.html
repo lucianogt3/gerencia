@@ -1,0 +1,222 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+<div class="dash">
+  <div class="page-head">
+    <div class="page-head-left">
+      <h1>📊 Dashboard de Indicadores</h1>
+      <p class="muted">{{ unit }} • {{ today }}</p>
+    </div>
+    <div class="head-actions">
+      <a href="{{ url_for('indicators.indicators_home') }}" class="btn btn-primary">
+        <i data-lucide="plus-circle" class="icon-sm"></i>
+        Novo Lançamento
+      </a>
+      <a href="{{ url_for('indicators.indicators_dashboard') }}" class="btn btn-outline">
+        <i data-lucide="refresh-cw" class="icon-sm"></i>
+        Atualizar
+      </a>
+    </div>
+  </div>
+
+  <div class="dash-grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; margin-bottom: 30px;">
+    <div class="card card-hover">
+      <div class="card-header bg-red-light">
+        <i data-lucide="alert-triangle" class="icon-lg text-red"></i>
+        <div>
+          <h3>Quedas</h3>
+          <small>Total período</small>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="stat-number">{{ total_quedas }}</div>
+      </div>
+    </div>
+
+    <div class="card card-hover">
+      <div class="card-header bg-orange-light">
+        <i data-lucide="pill" class="icon-lg text-orange"></i>
+        <div>
+          <h3>Erros Medicação</h3>
+          <small>Total período</small>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="stat-number">{{ total_erros }}</div>
+      </div>
+    </div>
+
+    <div class="card card-hover">
+      <div class="card-header bg-purple-light">
+        <i data-lucide="file-warning" class="icon-lg text-purple"></i>
+        <div>
+          <h3>Novas LPP</h3>
+          <small>Total período</small>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="stat-number">{{ total_lpp_novos }}</div>
+      </div>
+    </div>
+
+    <div class="card card-hover">
+      <div class="card-header bg-blue-light">
+        <i data-lucide="heart-off" class="icon-lg text-blue"></i>
+        <div>
+          <h3>Paradas / Óbitos</h3>
+          <small>Total período</small>
+        </div>
+      </div>
+      <div class="card-body" style="gap:16px;">
+        <div>
+          <div class="stat-number">{{ total_paradas }}</div>
+          <div class="stat-label">Paradas</div>
+        </div>
+        <div>
+          <div class="stat-number">{{ total_obitos }}</div>
+          <div class="stat-label">Óbitos</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-grid" style="grid-template-columns: 1fr; gap: 24px; margin-bottom: 30px;">
+    <div class="panel">
+      <div class="panel-header">
+        <h3><i data-lucide="bar-chart-3" class="icon-md"></i> Série histórica (D+N somados)</h3>
+        <select class="form-select form-select-sm" style="width: 160px;" id="chart-period">
+          <option value="15">Últimos 15 dias</option>
+          <option value="30">Últimos 30 dias</option>
+          <option value="90">Últimos 3 meses</option>
+        </select>
+      </div>
+      <div class="panel-body">
+        <div style="height: 320px; position: relative;">
+          <canvas id="mainChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <h3><i data-lucide="history" class="icon-md"></i> Lançamentos (por turno)</h3>
+    </div>
+    <div class="panel-body">
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Turno</th>
+              <th>LPP novos</th>
+              <th>Quedas</th>
+              <th>Erros</th>
+              <th>Óbitos</th>
+              <th>Status do dia (D+N)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ind in indicators %}
+              {% set st = status_map.get(ind.ref_date, 'PENDENTE') %}
+              {% set sh = (shifts_map.get(ind.ref_date, []) | list) %}
+              <tr onclick="window.location='{{ url_for('indicators.indicators_home') }}?date={{ ind.ref_date.strftime('%Y-%m-%d') }}&shift={{ ind.shift }}'" style="cursor:pointer;">
+                <td>{{ ind.ref_date.strftime('%d/%m/%Y') }}</td>
+                <td>
+                  <span class="badge {% if (ind.shift|string)|upper in ['D','DIURNO'] %}badge-day{% else %}badge-night{% endif %}">
+                    {{ ind.shift }}
+                  </span>
+                </td>
+                <td>{{ ind.lpp_novos or 0 }}</td>
+                <td>{{ ind.quedas or 0 }}</td>
+                <td>{{ ind.erros_med or 0 }}</td>
+                <td>{{ ind.obitos or 0 }}</td>
+                <td>
+                  {% if st == 'COMPLETO' %}
+                    <span class="badge badge-success">Completo (D+N)</span>
+                  {% elif st == 'PARCIAL' %}
+                    <span class="badge badge-warning">Parcial — falta {% if 'D' in sh %}Noturno{% else %}Diurno{% endif %}</span>
+                  {% else %}
+                    <span class="badge badge-danger">Pendente</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="7" class="text-center py-5">
+                  <p class="text-muted">Nenhum lançamento encontrado</p>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  const chartData = {
+    labels: {{ (dates|default([]))|tojson|safe }},
+    datasets: [
+      { label: 'LPP novos', data: {{ (lpp_novos_data|default([]))|tojson|safe }}, tension: 0.4, fill: false },
+      { label: 'Quedas', data: {{ (quedas_data|default([]))|tojson|safe }}, tension: 0.4, fill: false },
+      { label: 'Erros Medicação', data: {{ (erros_data|default([]))|tojson|safe }}, tension: 0.4, fill: false }
+    ]
+  };
+
+  const ctx = document.getElementById('mainChart').getContext('2d');
+  const mainChart = new Chart(ctx, {
+    type: 'line',
+    data: chartData,
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+  const sel = document.getElementById('chart-period');
+  if (sel) {
+    sel.addEventListener('change', function() {
+      const days = this.value;
+      fetch(`/indicators/api/dashboard-data?days=${days}`)
+        .then(r => r.json())
+        .then(data => {
+          if (!data.success) return;
+          mainChart.data.labels = data.dates || [];
+          mainChart.data.datasets[0].data = data.lpp_novos || [];
+          mainChart.data.datasets[1].data = data.quedas || [];
+          mainChart.data.datasets[2].data = data.erros || [];
+          mainChart.update();
+        });
+    });
+  }
+});
+</script>
+
+<style>
+.dash-grid { display:grid; gap:24px; margin-bottom:30px; }
+.card { background:white; border-radius:12px; border:1px solid #e5e7eb; overflow:hidden; transition:.2s; }
+.card-hover:hover { transform: translateY(-2px); box-shadow:0 10px 25px rgba(0,0,0,.1); }
+.card-header { padding:20px; display:flex; align-items:center; gap:12px; border-bottom:1px solid #f3f4f6; }
+.card-body { padding:20px; display:flex; align-items:center; justify-content:space-between; }
+.stat-number { font-size:34px; font-weight:800; color:#111827; line-height:1; }
+.stat-label { font-size:12px; color:#6b7280; }
+.panel { background:white; border-radius:12px; border:1px solid #e5e7eb; overflow:hidden; }
+.panel-header { padding:20px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #f3f4f6; }
+.panel-body { padding:20px; }
+.table { width:100%; border-collapse:collapse; }
+.table th { padding:12px 16px; background:#f9fafb; border-bottom:2px solid #e5e7eb; }
+.table td { padding:16px; border-bottom:1px solid #f3f4f6; }
+.badge { padding:4px 10px; border-radius:6px; font-size:12px; font-weight:600; display:inline-block; }
+.badge-day { background: rgba(245,158,11,.12); color:#b45309; border:1px solid rgba(245,158,11,.22); }
+.badge-night { background: rgba(59,130,246,.12); color:#1d4ed8; border:1px solid rgba(59,130,246,.22); }
+.badge-success { background: rgba(16,185,129,.12); color:#047857; border:1px solid rgba(16,185,129,.22); }
+.badge-warning { background: rgba(245,158,11,.12); color:#b45309; border:1px solid rgba(245,158,11,.22); }
+.badge-danger { background: rgba(239,68,68,.12); color:#b91c1c; border:1px solid rgba(239,68,68,.22); }
+.icon-sm{width:16px;height:16px}.icon-md{width:20px;height:20px}.icon-lg{width:24px;height:24px}
+.text-blue{color:#3b82f6}.text-red{color:#ef4444}.text-purple{color:#8b5cf6}.text-orange{color:#f59e0b}
+.bg-blue-light{background:rgba(59,130,246,.05)}.bg-red-light{background:rgba(239,68,68,.05)}
+.bg-purple-light{background:rgba(139,92,246,.05)}.bg-orange-light{background:rgba(245,158,11,.05)}
+</style>
+{% endblock %}

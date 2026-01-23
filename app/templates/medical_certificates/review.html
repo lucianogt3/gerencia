@@ -1,0 +1,68 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+<div class="dash">
+
+  <div class="page-head">
+    <div class="page-head-left">
+      <h1>🔎 Aprovação de Atestado</h1>
+      <div class="muted">Após salvo pelo colaborador, não pode editar nem apagar.</div>
+    </div>
+    <div class="head-actions">
+      <a class="btn secondary" href="{{ url_for('medical_certificates.index') }}">← Voltar</a>
+    </div>
+  </div>
+
+  <div class="cards" style="margin-bottom: 16px;">
+    <div class="card">
+      <div class="card-title">Status</div>
+      <div class="card-value">{{ note.status }}</div>
+      <div class="muted">pending / approved / rejected</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Matrícula</div>
+      <div class="card-value">{{ note.matricula }}</div>
+      <div class="muted">{{ note.nome or '' }}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Data</div>
+      <div class="card-value">{{ note.data_atestado.strftime('%d/%m/%Y') if note.data_atestado else '—' }}</div>
+      <div class="muted">Qtd dias: {{ note.dias or 0 }}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">CID</div>
+      <div class="card-value">{{ note.cid or '—' }}</div>
+      <div class="muted">Opcional</div>
+    </div>
+  </div>
+
+  <div class="panel" style="max-width: 860px;">
+    <div class="dash-grid" style="grid-template-columns: repeat(2, 1fr); gap: 14px;">
+      <div><strong>Setor:</strong> {{ note.setor or '—' }}</div>
+      <div><strong>Turno:</strong> {{ note.turno or '—' }}</div>
+      <div><strong>Arquivo:</strong>
+        {% if note.filename %}
+          <a class="btn secondary" href="{{ url_for('medical_certificates.download', note_id=note.id) }}">📎 Baixar</a>
+        {% else %}
+          —
+        {% endif %}
+      </div>
+      <div><strong>Enviado em:</strong> {{ note.created_at.strftime('%d/%m/%Y %H:%M') if note.created_at else '—' }}</div>
+    </div>
+
+    <form method="post" style="margin-top: 16px; display:flex; gap:10px; flex-wrap:wrap;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn primary" name="action" value="approve" type="submit"
+              onclick="return confirm('Confirmar APROVAÇÃO?')">✅ Aprovar</button>
+      <button class="btn" name="action" value="reject" type="submit"
+              onclick="return confirm('Confirmar REPROVAÇÃO?')">❌ Reprovar</button>
+    </form>
+  </div>
+
+</div>
+
+<style>
+  @media (max-width: 780px) {
+    .dash-grid[style*="repeat(2"] { grid-template-columns: 1fr !important; }
+  }
+</style>
+{% endblock %}

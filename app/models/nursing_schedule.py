@@ -1,133 +1,68 @@
 ﻿from __future__ import annotations
-from datetime import datetime, date
-from ..extensions import db
+from datetime import datetime
+from app.extensions import db
 
-# Turnos aceitos
-SHIFT_CHOICES = ("D", "N", "M", "T", "MT")
-
-# Status do dia (escala diÃ¡ria)
-DAY_STATUS = (
-    "OK",                 # veio conforme escala
-    "FALTA_NJ",           # falta Não justificada
-    "FALTA_J",            # falta justificada (se vocÃª quiser usar)
-    "ATESTADO_PEND",      # colaborador enviou, aguardando gestor
-    "ATESTADO_OK",        # gestor aprovou
-    "REMANEJADO",         # veio de outro setor
-    "EXTRA",              # cobertura extra
-    "FOLGA_COMP",         # cobertura por folga compensatÃ³ria
-)
+# Nota: Não importamos User ou Sector aqui para evitar Circular Import.
 
 class NursingMonthlySchedule(db.Model):
-    """
-    Escala mensal de Enfermagem (grade).
-    Ex.: UTI 1, Janeiro/2026.
-    """
-    __tablename__ = "nursing_monthly_schedules"
-
+    __tablename__ = "nursing_monthly_schedule"
     id = db.Column(db.Integer, primary_key=True)
-
-    sector_id = db.Column(db.Integer, db.ForeignKey("sectors.id"), nullable=False, index=True)
-    year = db.Column(db.Integer, nullable=False, index=True)
-    month = db.Column(db.Integer, nullable=False, index=True)  # 1-12
-
-    # draft -> editÃ¡vel; published -> equipe visualiza; archived -> histÃ³rico
-    status = db.Column(db.String(20), default="draft", nullable=False, index=True)
-
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    year = db.Column(db.Integer, nullable=False)
+    month = db.Column(db.Integer, nullable=False)
+    sector_id = db.Column(db.Integer, db.ForeignKey("sectors.id"), nullable=False)
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-
-    published_at = db.Column(db.DateTime, nullable=True)
-    published_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    status = db.Column(db.String(20), default="draft")
+    is_published = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    sector = db.relationship("Sector", backref="nursing_schedules")
+    members = db.relationship("NursingMonthlyMember", backref="schedule", lazy="dynamic", cascade="all, delete-orphan")
+    cells = db.relationship("NursingMonthlyCell", backref="schedule", lazy="dynamic", cascade="all, delete-orphan")
 
 class NursingMonthlyMember(db.Model):
-    """
-    Quem estÃ¡ na escala mensal e em qual 'posiÃ§Ã£o' (para preencher grade).
-    Ex.: ENF 1, TEC 1..6.
-    """
-    __tablename__ = "nursing_monthly_members"
-
+    __tablename__ = "nursing_monthly_member"
     id = db.Column(db.Integer, primary_key=True)
-
-    schedule_id = db.Column(db.Integer, db.ForeignKey("nursing_monthly_schedules.id"), nullable=False, index=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
-
-    # enfermeiro / tecnico / fisioterapeuta (se quiser expandir depois)
-    role = db.Column(db.String(20), nullable=False, index=True)
-
-    # posiÃ§Ã£o visual na grade (ex: TEC 1..6; ENF 1..2)
-    position = db.Column(db.Integer, nullable=False, index=True)
-
-    active = db.Column(db.Boolean, default=True, nullable=False)
-
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-
-    __table_args__ = (
-        db.UniqueConstraint("schedule_id", "role", "position", name="uq_member_slot"),
-        db.UniqueConstraint("schedule_id", "user_id", name="uq_member_user"),
-    )
+    schedule_id = db.Column(db.Integer, db.ForeignKey("nursing_monthly_schedule.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    role = db.Column(db.String(20), nullable=True)
+    active = db.Column(db.Boolean, default=True)
+    position = db.Column(db.Integer, default=0)
+    user = db.relationship("User", backref="nursing_memberships")
 
 class NursingMonthlyCell(db.Model):
-    """
-    CÃ©lula da grade mensal: qual membro estÃ¡ escalado em um dia especÃ­fico e turno.
-    Ex.: dia 10, turno D, TEC 3 = user X.
-    """
-    __tablename__ = "nursing_monthly_cells"
-
+    __tablename__ = "nursing_monthly_cell"
     id = db.Column(db.Integer, primary_key=True)
-
-    schedule_id = db.Column(db.Integer, db.ForeignKey("nursing_monthly_schedules.id"), nullable=False, index=True)
-    day = db.Column(db.Integer, nullable=False, index=True)      # 1..31
-    shift = db.Column(db.String(3), nullable=False, index=True)  # D/N/M/T/MT
-
-    role = db.Column(db.String(20), nullable=False, index=True)  # tecnico/enfermeiro
-    position = db.Column(db.Integer, nullable=False, index=True)
-
+    schedule_id = db.Column(db.Integer, db.ForeignKey("nursing_monthly_schedule.id"), nullable=False)
+    day = db.Column(db.Integer, nullable=False)
     planned_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-
-    __table_args__ = (
-        db.UniqueConstraint("schedule_id", "day", "shift", "role", "position", name="uq_monthly_cell"),
-    )
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    member_id = db.Column(db.Integer, db.ForeignKey("nursing_monthly_member.id"), nullable=True)
+    shift = db.Column(db.String(10), nullable=True)
+    code = db.Column(db.String(10), nullable=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class NursingDailyOverride(db.Model):
     """
-    O que aconteceu de verdade no dia (override da escala mensal).
-    Se existir registro aqui, ele manda na escala diÃ¡ria.
+    Tabela para armazenar trocas pontuais, atestados, extras e COOPERATIVA.
     """
-    __tablename__ = "nursing_daily_overrides"
-
+    __tablename__ = "nursing_daily_override"
     id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    code = db.Column(db.String(10), nullable=False)
+    description = db.Column(db.String(255), nullable=True)
 
-    schedule_id = db.Column(db.Integer, db.ForeignKey("nursing_monthly_schedules.id"), nullable=False, index=True)
-    sector_id = db.Column(db.Integer, db.ForeignKey("sectors.id"), nullable=False, index=True)
+    # --- CAMPO NOVO: TURNO ---
+    shift = db.Column(db.String(5), nullable=True) # D ou N
 
-    date = db.Column(db.Date, nullable=False, index=True)
-    shift = db.Column(db.String(3), nullable=False, index=True)  # D/N/M/T/MT
-
-    role = db.Column(db.String(20), nullable=False, index=True)
-    position = db.Column(db.Integer, nullable=False, index=True)
-
-    planned_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-    actual_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-
-    status = db.Column(db.String(20), default="OK", nullable=False, index=True)
-
-    # remanejamento
-    from_sector_id = db.Column(db.Integer, db.ForeignKey("sectors.id"), nullable=True)
-
-    # extra/folga
-    extra_type = db.Column(db.String(10), nullable=True)   # "EXTRA" | "FOLGA"
-    comp_day = db.Column(db.Date, nullable=True)           # se folga, dia da folga compensatÃ³ria
-
-    notes = db.Column(db.String(255), nullable=True)
-
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-
-    __table_args__ = (
-        db.UniqueConstraint("sector_id", "date", "shift", "role", "position", name="uq_daily_override"),
-    )
-
-
-
+    # --- COOPERATIVA ---
+    is_coop = db.Column(db.Boolean, default=False)
+    coop_name = db.Column(db.String(150))
+    coop_coren = db.Column(db.String(50))
+    coop_role = db.Column(db.String(50))
+    
+    related_date = db.Column(db.Date, nullable=True) 
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    user = db.relationship("User", backref="daily_overrides")

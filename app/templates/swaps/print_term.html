@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Termo de Troca</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 40px; color: #000; max-width: 800px; margin: 0 auto; background: white; }
+        .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 30px; }
+        .header h1 { margin: 0; font-size: 22px; text-transform: uppercase; }
+        .header h2 { margin: 5px 0; font-size: 16px; font-weight: normal; }
+        
+        .box { border: 1px solid #000; padding: 20px; margin-bottom: 25px; border-radius: 4px; }
+        .row { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .field { margin-bottom: 12px; line-height: 1.5; }
+        .label { font-weight: bold; text-decoration: underline; margin-bottom: 10px; display: block; }
+        
+        .signatures { margin-top: 80px; display: flex; justify-content: space-between; gap: 20px; }
+        .sign-box { flex: 1; border-top: 1px solid #000; text-align: center; padding-top: 5px; font-size: 12px; }
+        
+        /* Oculta botão na impressão */
+        @media print {
+            body { padding: 0; margin: 2cm; }
+            .no-print { display: none; }
+        }
+        
+        .btn-print { background: #3b82f6; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 5px; font-size: 16px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <button class="no-print btn-print" onclick="window.print()">🖨️ Imprimir Termo</button>
+
+    <div class="header">
+        <h1>BEM-T CARE - HOSPITAL BOUTIQUE</h1>
+        <h2>FORMULÁRIO PARA TROCA DE PLANTÃO</h2>
+    </div>
+
+    <div class="box">
+        <div class="label">AUTORIZAÇÃO:</div>
+        <div style="margin: 15px 0;">
+            ( <strong>{{ 'X' if swap.request_type == 'empregado' else ' ' }}</strong> ) A pedido do empregado &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            ( <strong>{{ 'X' if swap.request_type == 'servico' else ' ' }}</strong> ) Por necessidade do serviço
+        </div>
+        <p>
+            Autorizo a colaboradora <strong>{{ swap.requester.nome }}</strong> (Registro: {{ swap.requester.matricula }})
+            trocar de plantão com a colaboradora <strong>{{ swap.substitute.nome }}</strong> (Registro: {{ swap.substitute.matricula }})
+            conforme a opção destacada acima.
+        </p>
+    </div>
+
+    <div class="box">
+        <div class="label">DETALHAMENTO:</div>
+        
+        <div class="field">
+            1ª funcionária (<strong>{{ swap.substitute.nome }}</strong>) trabalhará no dia <strong>{{ swap.original_date.strftime('%d/%m/%Y') }}</strong>
+            no horário: <strong>{{ '07:00 às 19:00' if swap.original_shift == 'D' else '19:00 às 07:00' }}</strong>.
+        </div>
+
+        <div class="field">
+            2ª funcionária (<strong>{{ swap.requester.nome }}</strong>) trabalhará no dia <strong>{{ swap.target_date.strftime('%d/%m/%Y') if swap.target_date else '___/___/____' }}</strong>
+            no horário: <strong>{{ '07:00 às 19:00' if swap.target_shift == 'D' else '19:00 às 07:00' if swap.target_shift == 'N' else '___:___' }}</strong>.
+        </div>
+    </div>
+
+    <div class="box">
+        <div class="label">JUSTIFICATIVA:</div>
+        <p style="min-height: 40px;">{{ swap.reason or "Sem justificativa informada." }}</p>
+    </div>
+
+    <div class="signatures">
+        <div class="sign-box">
+            <strong>{{ swap.requester.nome }}</strong><br>1º Funcionário
+        </div>
+        <div class="sign-box">
+            <strong>{{ swap.substitute.nome }}</strong><br>2º Funcionário
+        </div>
+        <div class="sign-box">
+            <strong>Gerência / Coordenação</strong><br>Aprovado em {{ swap.updated_at.strftime('%d/%m/%Y') }}
+        </div>
+    </div>
+
+    <div style="margin-top: 40px; text-align: right;">
+        GOIÂNIA, {{ today.day }} de {{ today.strftime('%m') }} de {{ today.year }}.
+    </div>
+
+</body>
+</html>

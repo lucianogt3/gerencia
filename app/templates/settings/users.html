@@ -1,220 +1,361 @@
 ﻿{% extends "layouts/base.html" %}
 
 {% block content %}
-<div class="dash">
-  <!-- Cabeçalho -->
-  <div class="page-head">
-    <div class="page-head-left">
-      <h1>👥 Gerenciar Colaboradores</h1>
-      <div class="muted">
-        Gerencie a equipe, setores, turnos e permissões do sistema
+<div class="executive-container">
+  <!-- Cabeçalho Executivo -->
+  <div class="executive-header">
+    <div class="header-content">
+      <div class="header-left">
+        <h1 class="executive-title">
+          <i class="header-icon" data-lucide="users"></i>
+          Gerenciamento de Colaboradores
+        </h1>
+        <p class="executive-subtitle">
+          Gerencie equipes, setores, turnos e permissões do sistema de forma integrada
+        </p>
       </div>
-    </div>
-    <div class="head-actions">
-      <a class="btn" href="{{ url_for('auth.users_pending') }}">
-        👤 Pendentes
-      </a>
+      <div class="header-right">
+        <div class="header-actions">
+          <a class="btn-executive btn-primary" href="{{ url_for('auth.users_pending') }}">
+            <i data-lucide="user-plus" style="width: 14px; height: 14px;"></i>
+            <span>Solicitações Pendentes</span>
+          </a>
+          <a class="btn-executive btn-outline" href="#">
+            <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+            <span>Exportar</span>
+          </a>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- Filtros Modernos -->
-  <form class="filters" method="get">
-    <div class="form-group">
-      <label>🔍 Buscar</label>
-      <input class="input" name="q" value="{{ q }}"
-             placeholder="Nome, e-mail ou matrícula..."
-             type="search">
-    </div>
-
-    <div class="form-group">
-      <label>🎭 Cargo</label>
-      <select class="input" name="role" style="min-width: 120px;">
-        <option value="" {% if not role %}selected{% endif %}>Todos</option>
-        <option value="staff" {% if role == 'staff' %}selected{% endif %}>Staff</option>
-        <option value="technician" {% if role == 'technician' %}selected{% endif %}>Técnico</option>
-        <option value="nurse" {% if role == 'nurse' %}selected{% endif %}>Enfermeiro</option>
-        <option value="manager" {% if role == 'manager' %}selected{% endif %}>Gerência</option>
-        <option value="admin" {% if role == 'admin' %}selected{% endif %}>Admin</option>
-      </select>
-    </div>
-
-    <div class="form-group">
-      <label>📊 Status</label>
-      <select class="input" name="status">
-        <option value="" {% if not status %}selected{% endif %}>Todos</option>
-        <option value="active" {% if status == 'active' %}selected{% endif %}>Ativo</option>
-        <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Inativo</option>
-      </select>
-    </div>
-
-    <div class="form-group">
-      <button class="btn" type="submit" style="margin-top: 6px;">
-        🚀 Filtrar
-      </button>
-    </div>
-  </form>
-
-  <!-- Tabela de Colaboradores -->
-  <div class="panel">
-    <div class="panel-head">
-      <div>
-        <h2>Equipe Cadastrada</h2>
-        <div class="muted">{{ users|length }} colaboradores encontrados</div>
+  <!-- Cards de Estatísticas Executivo -->
+  <div class="executive-stats-grid">
+    <div class="stat-card">
+      <div class="stat-content">
+        <div class="stat-icon total">
+          <i data-lucide="users"></i>
+        </div>
+        <div class="stat-details">
+          <div class="stat-value">{{ total_users }}</div>
+          <div class="stat-label">Colaboradores</div>
+          <div class="stat-trend">
+            <i data-lucide="trending-up"></i>
+            <span>Total de cadastros</span>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="table-wrap">
-      <table class="table">
+    <div class="stat-card">
+      <div class="stat-content">
+        <div class="stat-icon active">
+          <i data-lucide="user-check"></i>
+        </div>
+        <div class="stat-details">
+          <div class="stat-value">{{ active_users }}</div>
+          <div class="stat-label">Ativos</div>
+          <div class="stat-trend">
+            <i data-lucide="activity"></i>
+            <span>Em operação</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-content">
+        <div class="stat-icon pending">
+          <i data-lucide="clock"></i>
+        </div>
+        <div class="stat-details">
+          <div class="stat-value">{{ pending_users }}</div>
+          <div class="stat-label">Pendentes</div>
+          <div class="stat-trend">
+            <i data-lucide="alert-circle"></i>
+            <span>Aguardando aprovação</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-content">
+        <div class="stat-icon blocked">
+          <i data-lucide="user-x"></i>
+        </div>
+        <div class="stat-details">
+          <div class="stat-value">{{ blocked_users }}</div>
+          <div class="stat-label">Inativos</div>
+          <div class="stat-trend">
+            <i data-lucide="pause-circle"></i>
+            <span>Acesso bloqueado</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Painel de Controle Executivo -->
+  <div class="executive-control-panel">
+    <div class="panel-header">
+      <h3 class="panel-title">
+        <i data-lucide="filter" style="width: 16px; height: 16px;"></i>
+        Filtros e Controles
+      </h3>
+      <div class="panel-tools">
+        <span class="badge-count">{{ users|length }} registros</span>
+      </div>
+    </div>
+    
+    <div class="panel-body">
+      <form method="get" class="executive-filters">
+        <div class="filter-row">
+          <div class="filter-group">
+            <label class="filter-label">Buscar Colaborador</label>
+            <div class="input-with-icon">
+              <i data-lucide="search"></i>
+              <input type="text" class="executive-input" name="q" value="{{ q }}"
+                     placeholder="Nome, e-mail ou matrícula...">
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <label class="filter-label">Cargo/Função</label>
+            <select class="executive-select" name="role">
+              <option value="" {% if not role %}selected{% endif %}>Todos os cargos</option>
+              <option value="staff" {% if role == 'staff' %}selected{% endif %}>Administrativo</option>
+              <option value="technician" {% if role == 'technician' %}selected{% endif %}>Técnico</option>
+              <option value="nurse" {% if role == 'nurse' %}selected{% endif %}>Enfermeiro</option>
+              <option value="condutor" {% if role == 'condutor' %}selected{% endif %}>Condutor</option>
+              <option value="manager" {% if role == 'manager' %}selected{% endif %}>Gerência</option>
+              <option value="admin" {% if role == 'admin' %}selected{% endif %}>Administrador</option>
+            </select>
+          </div>
+
+          <div class="filter-group">
+            <label class="filter-label">Status</label>
+            <select class="executive-select" name="status">
+              <option value="" {% if not status %}selected{% endif %}>Todos os status</option>
+              <option value="active" {% if status == 'active' %}selected{% endif %}>Ativo</option>
+              <option value="blocked" {% if status == 'blocked' %}selected{% endif %}>Bloqueado</option>
+              <option value="pending" {% if status == 'pending' %}selected{% endif %}>Pendente</option>
+            </select>
+          </div>
+
+          <div class="filter-actions">
+            <button class="btn-executive btn-primary" type="submit">
+              <i data-lucide="filter" style="width: 14px; height: 14px;"></i>
+              Aplicar Filtros
+            </button>
+            <a href="{{ url_for('settings.users') }}" class="btn-executive btn-outline">
+              <i data-lucide="refresh-ccw" style="width: 14px; height: 14px;"></i>
+              Limpar
+            </a>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tabela Executiva -->
+  <div class="executive-table-container">
+    <div class="table-header">
+      <h3 class="table-title">
+        <i data-lucide="list" style="width: 16px; height: 16px;"></i>
+        Lista de Colaboradores
+      </h3>
+      <div class="table-actions">
+        <div class="table-info">
+          <span class="table-count">{{ users|length }} colaboradores</span>
+          <span class="table-divider">•</span>
+          <span class="table-updated">Atualizado agora</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="executive-table">
         <thead>
           <tr>
-            <th>Nome</th>
-            <th>Matrícula</th>
-            <th>Cargo</th>
-            <th>Setor</th>
-            <th>Turno</th>
-            <th>Status</th>
-            <th>Datas</th>
-            <th style="width: 450px;">Ações</th>
+            <th class="user-col">
+              <span>COLABORADOR</span>
+            </th>
+            <th class="role-col">
+              <span>CARGO</span>
+            </th>
+            <th class="sector-col">
+              <span>SETOR</span>
+            </th>
+            <th class="shift-col">
+              <span>TURNO</span>
+            </th>
+            <th class="status-col">
+              <span>STATUS</span>
+            </th>
+            <th class="actions-col">
+              <span>AÇÕES</span>
+            </th>
           </tr>
         </thead>
 
         <tbody>
           {% for u in users %}
-          <tr>
-            <td>
-              <div style="display: flex; align-items: center; gap: 12px;">
-                <div style="width: 36px; height: 36px; border-radius: 50%;
-                          background: linear-gradient(135deg,
-                          {% if u.status == 'active' %}var(--primary){% else %}#ff4757{% endif %} 0%,
-                          {% if u.status == 'active' %}#8bc2ff{% else %}#ff6b81{% endif %} 100%);
-                          display: flex; align-items: center; justify-content: center;
-                          font-weight: bold; color: white;">
-                  {{ u.nome[0]|upper }}
+          <tr class="executive-row">
+            <td class="user-cell">
+              <div class="user-avatar">
+                <div class="avatar-circle">
+                  {{ (u.nome or "?")[0]|upper }}
                 </div>
-                <div>
-                  <strong>{{ u.nome }}</strong><br>
-                  <small class="muted">{{ u.email or "—" }}</small>
+                <div class="user-info">
+                  <div class="user-name">{{ u.nome }}</div>
+                  <div class="user-details">
+                    <span class="user-badge matricula">{{ u.matricula }}</span>
+                    <span class="user-divider">•</span>
+                    <span class="user-email">{{ u.email or "Sem e-mail" }}</span>
+                  </div>
                 </div>
               </div>
             </td>
 
-            <td><code>{{ u.matricula }}</code></td>
-
-            <td>
-              <span class="pill" style="background: rgba(74,125,255,.15);
-                                       border-color: rgba(74,125,255,.3);">
-                {{ ROLE_LABELS.get(u.role, u.role) }}
-              </span>
+            <td class="role-cell">
+              <span class="role-tag {{ u.role }}">{{ u.role_label }}</span>
             </td>
 
-            <td>{{ u.setor or "—" }}</td>
+            <td class="sector-cell">
+              <div class="sector-info">
+                <div class="sector-name">{{ (u.sector.name if u.sector else u.setor) or "—" }}</div>
+              </div>
+            </td>
 
-            <td>
+            <td class="shift-cell">
               {% if u.turno == 'D' %}
-                <span class="pill" style="background: rgba(255,170,0,.15);
-                                         border-color: rgba(255,170,0,.3);">
-                  ☀️ Diurno
-                </span>
+                <div class="shift-indicator day">
+                  <i data-lucide="sun"></i>
+                  <span>Diurno</span>
+                </div>
               {% elif u.turno == 'N' %}
-                <span class="pill" style="background: rgba(0,0,0,.2);
-                                         border-color: rgba(255,255,255,.2);">
-                  🌙 Noturno
-                </span>
+                <div class="shift-indicator night">
+                  <i data-lucide="moon"></i>
+                  <span>Noturno</span>
+                </div>
               {% else %}
-                —
+                <div class="shift-indicator undefined">
+                  <i data-lucide="help-circle"></i>
+                  <span>Não definido</span>
+                </div>
               {% endif %}
             </td>
 
-            <td>
+            <td class="status-cell">
               {% if u.status == 'active' %}
-                <span class="badge badge-active">
-                  <span class="status-dot active"></span>
-                  Ativo
-                </span>
+                <div class="status-badge active">
+                  <div class="status-dot"></div>
+                  <span>Ativo</span>
+                </div>
+              {% elif u.status == 'pending' %}
+                <div class="status-badge pending">
+                  <div class="status-dot"></div>
+                  <span>Pendente</span>
+                </div>
               {% else %}
-                <span class="badge badge-inactive">
-                  <span class="status-dot inactive"></span>
-                  Inativo
-                </span>
+                <div class="status-badge blocked">
+                  <div class="status-dot"></div>
+                  <span>Bloqueado</span>
+                </div>
               {% endif %}
             </td>
 
-            <td>
-              <div class="date-info">
-                <div>
-                  <div class="date-label">Cadastro</div>
-                  <div class="date-value">
-                    {{ u.created_at.strftime('%d/%m/%Y') if u.created_at else '—' }}
-                  </div>
-                </div>
-                {% if u.status == 'inactive' and u.inactivated_at %}
-                <div>
-                  <div class="date-label">Inativado em</div>
-                  <div class="date-value">
-                    {{ u.inactivated_at.strftime('%d/%m/%Y') }}
-                  </div>
-                </div>
-                {% endif %}
-              </div>
-            </td>
-
-            <td>
-              <div class="actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <!-- Botão Ativar/Desativar -->
-                <form method="post"
-                      action="{{ url_for('settings.users_toggle', user_id=u.id) }}"
-                      style="display: inline;">
+            <td class="actions-cell">
+              <div class="action-toolbar">
+                <!-- Ativar/Desativar -->
+                <form method="post" action="{{ url_for('settings.users_toggle', user_id=u.id) }}" 
+                      class="action-form">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   {% if u.status == 'active' %}
-                    <button class="btn-status btn-inactive"
-                            type="submit"
-                            onclick="return confirm('Tem certeza que deseja DESATIVAR {{ u.nome }}?')">
-                      🚫 Desativar
+                    <button type="submit" class="action-btn danger" 
+                            onclick="return confirm('Bloquear acesso de {{ u.nome }}?')"
+                            title="Bloquear acesso">
+                      <i data-lucide="user-x"></i>
                     </button>
                   {% else %}
-                    <button class="btn-status btn-active"
-                            type="submit"
-                            onclick="return confirm('Tem certeza que deseja ATIVAR {{ u.nome }}?')">
-                      ✅ Ativar
+                    <button type="submit" class="action-btn success" 
+                            onclick="return confirm('Ativar acesso de {{ u.nome }}?')"
+                            title="Ativar acesso">
+                      <i data-lucide="user-check"></i>
                     </button>
                   {% endif %}
                 </form>
 
-                <!-- Atualizar setor/turno/role -->
-                <form method="post"
-                      action="{{ url_for('settings.users_update', user_id=u.id) }}"
-                      style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                <!-- Resetar Senha -->
+                <form method="post" action="{{ url_for('settings.users_reset_password', user_id=u.id) }}" 
+                      class="action-form">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-                  <select class="input" name="setor" style="min-width: 120px;">
-                    <option value="">— Setor —</option>
-                    {% for s in sectors %}
-                    <option value="{{ s.name }}"
-                            {% if u.setor == s.name %}selected{% endif %}>
-                      {{ s.name }}
-                    </option>
-                    {% endfor %}
-                  </select>
-
-                  <select class="input" name="turno" style="width: 90px;">
-                    <option value="">— Turno —</option>
-                    <option value="D" {% if u.turno == 'D' %}selected{% endif %}>D</option>
-                    <option value="N" {% if u.turno == 'N' %}selected{% endif %}>N</option>
-                  </select>
-
-                  <select class="input" name="role" style="min-width: 120px;">
-                    <option value="staff" {% if u.role == 'staff' %}selected{% endif %}>Staff</option>
-                    <option value="technician" {% if u.role == 'technician' %}selected{% endif %}>Técnico</option>
-                    <option value="nurse" {% if u.role == 'nurse' %}selected{% endif %}>Enfermeiro</option>
-                    <option value="manager" {% if u.role == 'manager' %}selected{% endif %}>Gerência</option>
-                    <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>Admin</option>
-                  </select>
-
-                  <button class="btn small" type="submit" style="background: rgba(74,125,255,.2);
-                                                                border: 1px solid rgba(74,125,255,.3);">
-                    💾 Salvar
+                  <button type="submit" class="action-btn warning" 
+                          onclick="return confirm('Resetar senha para padrão?')"
+                          title="Resetar senha">
+                    <i data-lucide="key"></i>
                   </button>
                 </form>
+
+                <!-- Edição Rápida -->
+                <div class="quick-edit">
+                  <button class="action-btn primary edit-toggle" 
+                          onclick="toggleEditRow(this)">
+                    <i data-lucide="edit-2"></i>
+                  </button>
+                  
+                  <div class="edit-panel">
+                    <form method="post" action="{{ url_for('settings.users_update', user_id=u.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      
+                      <div class="edit-grid">
+                        <div class="edit-field">
+                          <label>Setor</label>
+                          <select name="sector_id" class="edit-select">
+                            <option value="">— Setor —</option>
+                            {% for s in sectors %}
+                              <option value="{{ s.id }}" {% if (u.sector_id == s.id) or (not u.sector_id and u.setor == s.name) %}selected{% endif %}>
+                                {{ s.name }}
+                              </option>
+                            {% endfor %}
+                          </select>
+                        </div>
+                        
+                        <div class="edit-field">
+                          <label>Turno</label>
+                          <select name="turno" class="edit-select">
+                            <option value="">Turno</option>
+                            <option value="D" {% if u.turno == 'D' %}selected{% endif %}>Diurno</option>
+                            <option value="N" {% if u.turno == 'N' %}selected{% endif %}>Noturno</option>
+                          </select>
+                        </div>
+                        
+                        <div class="edit-field">
+                          <label>Cargo</label>
+                          <select name="role" class="edit-select">
+                            <option value="staff" {% if u.role == 'staff' %}selected{% endif %}>Staff</option>
+                            <option value="technician" {% if u.role == 'technician' %}selected{% endif %}>Técnico</option>
+                            <option value="nurse" {% if u.role == 'nurse' %}selected{% endif %}>Enfermeiro</option>
+                            <option value="condutor" {% if u.role == 'condutor' %}selected{% endif %}>Condutor</option>
+                            <option value="manager" {% if u.role == 'manager' %}selected{% endif %}>Gerência</option>
+                            <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>Admin</option>
+                          </select>
+                        </div>
+                        
+                        <div class="edit-actions">
+                          <button type="submit" class="action-btn success">
+                            <i data-lucide="check"></i>
+                          </button>
+                          <button type="button" class="action-btn outline cancel-edit"
+                                  onclick="toggleEditRow(this)">
+                            <i data-lucide="x"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  </div>
+                </div>
               </div>
             </td>
           </tr>
@@ -222,6 +363,871 @@
         </tbody>
       </table>
     </div>
+
+    {% if users|length == 0 %}
+    <div class="empty-state">
+      <div class="empty-icon">
+        <i data-lucide="users" style="width: 48px; height: 48px;"></i>
+      </div>
+      <h4 class="empty-title">Nenhum colaborador encontrado</h4>
+      <p class="empty-description">
+        Tente ajustar os filtros ou adicione novos colaboradores ao sistema.
+      </p>
+    </div>
+    {% endif %}
   </div>
 </div>
+
+<style>
+/* Estilos Executivos */
+:root {
+  --executive-primary: #2c3e50;
+  --executive-secondary: #34495e;
+  --executive-accent: #3498db;
+  --executive-success: #27ae60;
+  --executive-warning: #f39c12;
+  --executive-danger: #e74c3c;
+  --executive-light: #ecf0f1;
+  --executive-dark: #1a252f;
+  --executive-gray: #7f8c8d;
+  --executive-border: #dee2e6;
+}
+
+.executive-container {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  background: #f8f9fa;
+  min-height: 100vh;
+}
+
+/* Header Executivo */
+.executive-header {
+  background: linear-gradient(135deg, var(--executive-primary), var(--executive-secondary));
+  border-radius: 12px;
+  padding: 32px;
+  margin-bottom: 24px;
+  color: white;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.executive-title {
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.executive-subtitle {
+  font-size: 15px;
+  opacity: 0.9;
+  margin: 0;
+  font-weight: 400;
+}
+
+.header-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* Botões Executivos */
+.btn-executive {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn-executive.btn-primary {
+  background: var(--executive-accent);
+  color: white;
+  border-color: var(--executive-accent);
+}
+
+.btn-executive.btn-primary:hover {
+  background: #2980b9;
+  border-color: #2980b9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.2);
+}
+
+.btn-executive.btn-outline {
+  background: transparent;
+  color: white;
+  border-color: rgba(255,255,255,0.3);
+}
+
+.btn-executive.btn-outline:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.5);
+}
+
+/* Estatísticas Executivo */
+.executive-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  border: 1px solid var(--executive-border);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+
+.stat-content {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.stat-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-icon.total {
+  background: rgba(52, 152, 219, 0.1);
+  color: var(--executive-accent);
+}
+
+.stat-icon.active {
+  background: rgba(39, 174, 96, 0.1);
+  color: var(--executive-success);
+}
+
+.stat-icon.pending {
+  background: rgba(243, 156, 18, 0.1);
+  color: var(--executive-warning);
+}
+
+.stat-icon.blocked {
+  background: rgba(231, 76, 60, 0.1);
+  color: var(--executive-danger);
+}
+
+.stat-details {
+  flex: 1;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--executive-dark);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: var(--executive-gray);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.stat-trend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--executive-gray);
+}
+
+/* Painel de Controle */
+.executive-control-panel {
+  background: white;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  border: 1px solid var(--executive-border);
+  overflow: hidden;
+}
+
+.panel-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--executive-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--executive-dark);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.panel-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.badge-count {
+  background: var(--executive-light);
+  color: var(--executive-gray);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.panel-body {
+  padding: 24px;
+}
+
+.executive-filters {
+  width: 100%;
+}
+
+.filter-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  align-items: end;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filter-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--executive-gray);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-icon i {
+  position: absolute;
+  left: 12px;
+  color: var(--executive-gray);
+  width: 16px;
+  height: 16px;
+}
+
+.executive-input {
+  width: 100%;
+  padding: 12px 12px 12px 40px;
+  border: 1px solid var(--executive-border);
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  background: white;
+  color: var(--executive-dark);
+}
+
+.executive-input:focus {
+  outline: none;
+  border-color: var(--executive-accent);
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.executive-select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--executive-border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  color: var(--executive-dark);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.executive-select:focus {
+  outline: none;
+  border-color: var(--executive-accent);
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.filter-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* Tabela Executiva */
+.executive-table-container {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid var(--executive-border);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.table-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--executive-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.table-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--executive-dark);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.table-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--executive-gray);
+}
+
+.table-count {
+  font-weight: 500;
+}
+
+.table-divider {
+  opacity: 0.5;
+}
+
+.table-updated {
+  font-size: 12px;
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+.executive-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1000px;
+}
+
+.executive-table thead {
+  background: var(--executive-light);
+}
+
+.executive-table th {
+  padding: 16px 20px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--executive-gray);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--executive-border);
+}
+
+.executive-table td {
+  padding: 20px;
+  border-bottom: 1px solid var(--executive-border);
+  vertical-align: middle;
+}
+
+.executive-row:hover {
+  background: rgba(52, 152, 219, 0.02);
+}
+
+/* Células da Tabela */
+.user-avatar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--executive-accent), #8e44ad);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.user-info {
+  flex: 1;
+}
+
+.user-name {
+  font-weight: 600;
+  color: var(--executive-dark);
+  margin-bottom: 4px;
+}
+
+.user-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--executive-gray);
+}
+
+.user-badge.matricula {
+  background: var(--executive-light);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-weight: 500;
+}
+
+.user-divider {
+  opacity: 0.5;
+}
+
+/* Role Tags */
+.role-tag {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.role-tag.staff { background: #e8f4fc; color: #2980b9; }
+.role-tag.technician { background: #e8f8f0; color: #27ae60; }
+.role-tag.nurse { background: #fef5e7; color: #f39c12; }
+.role-tag.condutor { background: #f9eaea; color: #c0392b; }
+.role-tag.manager { background: #f4ecf7; color: #8e44ad; }
+.role-tag.admin { background: #2c3e50; color: white; }
+
+/* Setor */
+.sector-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sector-name {
+  font-weight: 500;
+  color: var(--executive-dark);
+}
+
+/* Turno */
+.shift-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  width: fit-content;
+}
+
+.shift-indicator.day {
+  background: #fef5e7;
+  color: #f39c12;
+}
+
+.shift-indicator.night {
+  background: #e8f4fc;
+  color: #2980b9;
+}
+
+.shift-indicator.undefined {
+  background: var(--executive-light);
+  color: var(--executive-gray);
+}
+
+.shift-indicator i {
+  width: 14px;
+  height: 14px;
+}
+
+/* Status */
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  width: fit-content;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-badge.active {
+  background: #e8f8f0;
+  color: #27ae60;
+}
+
+.status-badge.active .status-dot {
+  background: #27ae60;
+}
+
+.status-badge.pending {
+  background: #fef5e7;
+  color: #f39c12;
+}
+
+.status-badge.pending .status-dot {
+  background: #f39c12;
+}
+
+.status-badge.blocked {
+  background: #f9eaea;
+  color: #e74c3c;
+}
+
+.status-badge.blocked .status-dot {
+  background: #e74c3c;
+}
+
+/* Ações */
+.action-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-form {
+  display: inline;
+}
+
+.action-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+}
+
+.action-btn i {
+  width: 16px;
+  height: 16px;
+}
+
+.action-btn.danger {
+  color: var(--executive-danger);
+  border-color: rgba(231, 76, 60, 0.2);
+}
+
+.action-btn.danger:hover {
+  background: rgba(231, 76, 60, 0.1);
+  border-color: rgba(231, 76, 60, 0.3);
+}
+
+.action-btn.success {
+  color: var(--executive-success);
+  border-color: rgba(39, 174, 96, 0.2);
+}
+
+.action-btn.success:hover {
+  background: rgba(39, 174, 96, 0.1);
+  border-color: rgba(39, 174, 96, 0.3);
+}
+
+.action-btn.warning {
+  color: var(--executive-warning);
+  border-color: rgba(243, 156, 18, 0.2);
+}
+
+.action-btn.warning:hover {
+  background: rgba(243, 156, 18, 0.1);
+  border-color: rgba(243, 156, 18, 0.3);
+}
+
+.action-btn.primary {
+  color: var(--executive-accent);
+  border-color: rgba(52, 152, 219, 0.2);
+}
+
+.action-btn.primary:hover {
+  background: rgba(52, 152, 219, 0.1);
+  border-color: rgba(52, 152, 219, 0.3);
+}
+
+.action-btn.outline {
+  color: var(--executive-gray);
+  border-color: var(--executive-border);
+}
+
+.action-btn.outline:hover {
+  background: var(--executive-light);
+}
+
+/* Edição Rápida */
+.quick-edit {
+  position: relative;
+}
+
+.edit-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: white;
+  border: 1px solid var(--executive-border);
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  z-index: 100;
+  min-width: 300px;
+  display: none;
+}
+
+.edit-panel.active {
+  display: block;
+}
+
+.edit-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.edit-field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--executive-gray);
+}
+
+.edit-select {
+  padding: 8px 12px;
+  border: 1px solid var(--executive-border);
+  border-radius: 6px;
+  font-size: 13px;
+  background: white;
+  color: var(--executive-dark);
+  width: 100%;
+}
+
+.edit-select:focus {
+  outline: none;
+  border-color: var(--executive-accent);
+}
+
+.edit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+/* Estado Vazio */
+.empty-state {
+  padding: 60px 24px;
+  text-align: center;
+}
+
+.empty-icon {
+  margin-bottom: 20px;
+  color: var(--executive-gray);
+  opacity: 0.5;
+}
+
+.empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--executive-dark);
+  margin-bottom: 8px;
+}
+
+.empty-description {
+  color: var(--executive-gray);
+  font-size: 14px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+/* Responsividade */
+@media (max-width: 1200px) {
+  .filter-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .executive-container {
+    padding: 16px;
+  }
+  
+  .executive-header {
+    padding: 24px;
+  }
+  
+  .header-content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .executive-stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .filter-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .filter-actions {
+    flex-direction: column;
+  }
+  
+  .btn-executive {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .table-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .table-actions {
+    justify-content: space-between;
+  }
+  
+  .edit-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: calc(100% - 32px);
+    max-width: 400px;
+  }
+}
+
+/* Animações */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.executive-row {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Scrollbar personalizada */
+.table-responsive::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+  background: var(--executive-light);
+  border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+  background: var(--executive-gray);
+  border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+  background: var(--executive-dark);
+}
+</style>
+
+<script>
+// Inicializar ícones Lucide
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+});
+
+// Toggle para edição rápida
+function toggleEditRow(button) {
+  const editPanel = button.closest('.quick-edit').querySelector('.edit-panel');
+  editPanel.classList.toggle('active');
+  
+  // Fechar outros painéis abertos
+  document.querySelectorAll('.edit-panel.active').forEach(panel => {
+    if (panel !== editPanel) {
+      panel.classList.remove('active');
+    }
+  });
+}
+
+// Fechar painéis ao clicar fora
+document.addEventListener('click', function(event) {
+  if (!event.target.closest('.quick-edit')) {
+    document.querySelectorAll('.edit-panel.active').forEach(panel => {
+      panel.classList.remove('active');
+    });
+  }
+});
+</script>
 {% endblock %}

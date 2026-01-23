@@ -1,1 +1,1 @@
-﻿
+﻿from .sick_note import SickNote

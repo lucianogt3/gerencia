@@ -1,455 +1,807 @@
-{% extends "layouts/base.html" %}
-{% block content %}
-
-<div class="dash">
-
-  <!-- Cabeçalho -->
-  <div class="page-head">
-    <div class="page-head-left">
-      <a class="muted" href="{{ url_for('nursing_ui.month_details', ano=ano, mes=mes) }}">← Voltar para o mês</a>
-      <h1>🗓️ Escala Mensal</h1>
-      <div class="muted">
-        Setor: {{ active_sector.name if active_sector else "—" }}
-        • {{ "%02d"|format(mes) }}/{{ ano }}
-        • Status: {{ status or "draft" }}
-      </div>
-    </div>
-
-    <div class="head-actions">
-      <button class="btn" type="button" id="btnImportSector">👥 Importar ativos do setor</button>
-      <button class="btn primary" type="button" id="btnAddProfessional">➕ Adicionar profissional</button>
-      <button class="btn" type="button" disabled title="PDF depois">⬇️ Exportar PDF</button>
-    </div>
-  </div>
-
-  <!-- Editor de Escala -->
-  <div class="card" style="margin-top:12px;">
-    <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-      <div>
-        <div style="font-weight:700;">Escala • {{ "%02d"|format(mes) }}/{{ ano }}</div>
-        <div class="muted" style="margin-top:2px;">Clique em um profissional para editar / mover / remover</div>
-      </div>
-
-      <div style="display:flex;gap:8px;align-items:center;">
-        <button class="btn" type="button" id="btnImportSector2">👥 Importar</button>
-        <button class="btn primary" type="button" id="btnAddProfessional2">➕ Adicionar</button>
-      </div>
-    </div>
-
-    <!-- Grade -->
-    <div class="table-wrap" style="margin-top:12px;overflow:auto;border-radius:12px;border:1px solid rgba(255,255,255,.08);">
-      <table class="table" style="min-width:980px;">
-        <thead>
-          <tr>
-            <th style="position:sticky;left:0;z-index:2;background:var(--card);min-width:260px;">
-              Profissional / Regra
-            </th>
-
-            {# ✅ dias do mês calculados a partir de days #}
-            {% for d in range(1, (days|length) + 1) %}
-              <th style="text-align:center;min-width:34px;">{{ "%02d"|format(d) }}</th>
-            {% endfor %}
-          </tr>
-        </thead>
-
-        <tbody>
-          {% if rows and rows|length %}
-            {% for group in rows %}
-
-              {# Cabeçalho do grupo (Cargo/Role) #}
-              <tr>
-                <td colspan="{{ 1 + (days|length) }}"
-                    style="padding:10px 12px;font-weight:800;background:rgba(255,255,255,.04);">
-                  {{ group["title"] if group is mapping and group.get("title") else (group.title if group.title is defined else "—") }}
-                </td>
-              </tr>
-
-              {% set items = (group.get("items") if group is mapping else (group.items if group.items is defined else [])) %}
-              {% for r in items %}
-                <tr class="row-prof">
-                  <!-- coluna fixa -->
-                  <td style="position:sticky;left:0;z-index:1;background:var(--card);">
-                    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-                      <div>
-                        <div style="font-weight:700;">{{ r.name if r.name is defined else r.get("name","—") }}</div>
-                        <div class="muted" style="font-size:.85rem;">
-                          {{ r.rule_label if r.rule_label is defined else r.get("rule_label","—") }}
-                          •
-                          {{ r.matricula if r.matricula is defined else r.get("matricula","—") }}
-                        </div>
-                      </div>
-
-                      <button class="btn small" type="button"
-                        data-open-transfer="1"
-                        data-user-id="{{ r.user_id if r.user_id is defined else r.get('user_id',0) }}"
-                        data-user-name="{{ r.name if r.name is defined else r.get('name','') }}"
-                        data-user-sector-id="{{ r.sector_id if r.sector_id is defined else r.get('sector_id',0) }}"
-                        data-user-sector-name="{{ r.sector_name if r.sector_name is defined else r.get('sector_name','') }}">
-                        ⚙️
-                      </button>
-                    </div>
-                  </td>
-
-                  {% set cells = (r.cells if r.cells is defined else r.get("cells", {})) %}
-                  {% for d in range(1, (days|length) + 1) %}
-                    {% set cell = (cells.get(d) if cells is mapping else None) %}
-                    <td style="text-align:center;">
-                      {% if cell %}
-                        <span class="pill">{{ cell }}</span>
-                      {% else %}
-                        <span class="muted">—</span>
-                      {% endif %}
-                    </td>
-                  {% endfor %}
-                </tr>
-              {% endfor %}
-            {% endfor %}
-          {% else %}
-            <tr>
-              <td colspan="{{ 1 + (days|length) }}" class="muted" style="padding:14px;">
-                Nenhum profissional ainda. Use “Importar” ou “Adicionar”.
-              </td>
-            </tr>
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-</div>
-
-
-<!-- =========================
-  MODAL: Importar Setor
-========================= -->
-<div class="modal" id="modalImport" aria-hidden="true">
-  <div class="modal-card">
-    <div class="modal-head">
-      <h3>Importar ativos do setor</h3>
-      <button class="icon-btn" type="button" data-close="#modalImport">✕</button>
-    </div>
-
-    <div class="modal-body">
-      <p class="muted">
-        Isso vai adicionar TODOS os colaboradores ativos do setor
-        <strong>{{ active_sector.name if active_sector else "—" }}</strong>.
-      </p>
-
-      <label class="check" style="display:flex;gap:10px;align-items:center;margin-top:10px;">
-        <input type="checkbox" id="importAutoFill" checked>
-        <span>Auto preencher mês (par/ímpar, diurno/noturno)</span>
-      </label>
-
-      <div class="alert warn" style="margin-top:12px;">
-        Se o colaborador estiver em outro setor no mesmo mês, use o modal "Adicionar profissional"
-        para transferir com confirmação.
-      </div>
-    </div>
-
-    <div class="modal-foot">
-      <button class="btn" type="button" data-close="#modalImport">Cancelar</button>
-      <button class="btn primary" type="button" id="confirmImport">Importar agora</button>
-    </div>
-  </div>
-</div>
-
-
-<!-- =========================
-  MODAL: Adicionar Profissional
-========================= -->
-<div class="modal" id="modalAdd" aria-hidden="true">
-  <div class="modal-card">
-    <div class="modal-head">
-      <h3>Adicionar profissional</h3>
-      <button class="icon-btn" type="button" data-close="#modalAdd">✕</button>
-    </div>
-
-    <div class="modal-body">
-      <div class="row" style="display:flex;gap:10px;align-items:end;">
-        <div style="flex:1;">
-          <label>Buscar (nome ou matrícula)</label>
-          <input class="input" id="searchUser" placeholder="Ex: Luciano ou 12345" type="search">
-        </div>
-        <button class="btn" type="button" id="btnSearchUser">Buscar</button>
-      </div>
-
-      <div id="searchResults" style="margin-top:12px;">
-        <div class="muted">Digite e clique em Buscar.</div>
-      </div>
-    </div>
-
-    <div class="modal-foot">
-      <button class="btn" type="button" data-close="#modalAdd">Fechar</button>
-    </div>
-  </div>
-</div>
-
-
-<!-- =========================
-  MODAL: Confirmar Transferência
-========================= -->
-<div class="modal" id="modalConfirmTransfer" aria-hidden="true">
-  <div class="modal-card">
-    <div class="modal-head">
-      <h3>Confirmar transferência</h3>
-      <button class="icon-btn" type="button" data-close="#modalConfirmTransfer">✕</button>
-    </div>
-
-    <div class="modal-body">
-      <p>
-        O profissional <strong id="ctName">—</strong> está em outro setor:
-        <strong id="ctFromSector">—</strong>.
-      </p>
-
-      <p class="muted" style="margin-top:6px;">
-        Ao confirmar, ele será removido da escala do setor anterior neste mês e adicionado aqui.
-      </p>
-
-      <label style="margin-top:10px;display:block;">Motivo (opcional)</label>
-      <input class="input" id="ctNotes" placeholder="Ex: Cobertura, remanejamento, apoio...">
-
-      <input type="hidden" id="ctUserId">
-      <input type="hidden" id="ctUserSectorId">
-    </div>
-
-    <div class="modal-foot">
-      <button class="btn" type="button" data-close="#modalConfirmTransfer">Cancelar</button>
-      <button class="btn danger" type="button" id="confirmTransfer">Confirmar</button>
-    </div>
-  </div>
-</div>
-
-
-<script>
-(function () {
-  const scheduleId = Number("{{ schedule_id|default(0) }}");
-  const sectorId   = Number("{{ active_sector_id|default(0) }}");
-  const year       = Number("{{ ano|default(0) }}");
-  const month      = Number("{{ mes|default(0) }}");
-
-  function openModal(sel) {
-    const el = document.querySelector(sel);
-    if (!el) return;
-    el.setAttribute("aria-hidden", "false");
-    el.classList.add("open");
-  }
-
-  function closeModal(sel) {
-    const el = document.querySelector(sel);
-    if (!el) return;
-    el.setAttribute("aria-hidden", "true");
-    el.classList.remove("open");
-  }
-
-  document.addEventListener("click", (e) => {
-    const closeBtn = e.target.closest("[data-close]");
-    if (closeBtn) closeModal(closeBtn.getAttribute("data-close"));
-  });
-
-  const btnImportSector1 = document.getElementById("btnImportSector");
-  const btnImportSector2 = document.getElementById("btnImportSector2");
-  const btnAddProfessional1 = document.getElementById("btnAddProfessional");
-  const btnAddProfessional2 = document.getElementById("btnAddProfessional2");
-
-  if (btnImportSector1) btnImportSector1.addEventListener("click", () => openModal("#modalImport"));
-  if (btnImportSector2) btnImportSector2.addEventListener("click", () => openModal("#modalImport"));
-  if (btnAddProfessional1) btnAddProfessional1.addEventListener("click", () => openModal("#modalAdd"));
-  if (btnAddProfessional2) btnAddProfessional2.addEventListener("click", () => openModal("#modalAdd"));
-
-  const confirmImport = document.getElementById("confirmImport");
-  if (confirmImport) {
-    confirmImport.addEventListener("click", async () => {
-      const autoFill = document.getElementById("importAutoFill")?.checked ?? true;
-
-      try {
-        const res = await fetch(`/api/nursing/monthly/${scheduleId}/import_sector`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ auto_fill: autoFill })
-        });
-
-        const j = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          alert(j.error || "Falha ao importar setor");
-          return;
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor de Escala • {{ active_sector.name }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-body: #0a0c10;
+            --bg-card: #151921;
+            --bg-header: #1c222c;
+            --primary: #3d8aff;
+            --primary-hover: #5a9bff;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.06);
         }
 
-        closeModal("#modalImport");
-        location.reload();
-      } catch (err) {
-        alert("Erro de rede ao importar setor.");
-      }
-    });
-  }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--bg-body); color: var(--text-main); -webkit-font-smoothing: antialiased; }
+        .container { max-width: 100%; padding: 24px; }
 
-  const btnSearchUser = document.getElementById("btnSearchUser");
-  const searchUser = document.getElementById("searchUser");
-  const searchResults = document.getElementById("searchResults");
+        /* Header Estilo SaaS */
+        .glass-header {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            padding: 24px; border-radius: 16px; border: 1px solid var(--border);
+            margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+        }
 
-  async function doSearch() {
-    const q = (searchUser?.value || "").trim();
-    if (!searchResults) return;
+        .header-info h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: 4px; }
+        .header-info p { font-size: 0.9rem; color: var(--text-muted); }
+        
+        /* BARRA DE FILTROS */
+        .filter-toolbar {
+            background: var(--bg-card); padding: 20px; border-radius: 16px;
+            border: 1px solid var(--border); margin-bottom: 24px;
+            display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap;
+        }
+        .filter-group { display: flex; flex-direction: column; gap: 8px; }
+        .filter-group label { font-size: 0.7rem; font-weight: 800; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; }
+        
+        .control-input {
+            background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+            border-radius: 8px; color: white; padding: 10px 14px; font-size: 0.85rem; font-weight: 600;
+            outline: none; transition: all 0.2s; min-width: 200px;
+        }
+        .control-input:focus { border-color: var(--primary); background: rgba(255,255,255,0.06); }
 
-    if (!q) {
-      searchResults.innerHTML = '<div class="muted">Digite algo para buscar.</div>';
-      return;
-    }
+        /* BOTÕES DE AÇÃO */
+        .action-buttons {
+            display: flex; gap: 12px; margin-bottom: 24px;
+        }
+        
+        .btn { 
+            padding: 12px 20px; 
+            border-radius: 8px; 
+            font-weight: 700; 
+            cursor: pointer; 
+            border: none; 
+            display: flex; 
+            align-items: center; 
+            gap: 8px; 
+            font-size: 0.85rem; 
+            transition: all 0.2s;
+        }
+        .btn:hover { transform: translateY(-2px); }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-success { background: var(--success); color: white; }
+        .btn-warning { background: var(--warning); color: white; }
+        .btn-secondary { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+        .btn-secondary:hover { background: rgba(255,255,255,0.1); }
 
-    searchResults.innerHTML = '<div class="muted">Buscando...</div>';
+        /* GRID E TABELA - CORRIGIDO */
+        .scale-card { 
+            background: var(--bg-card); 
+            border-radius: 16px; 
+            border: 1px solid var(--border); 
+            overflow: hidden; 
+        }
+        .scroll-area { 
+            overflow: auto; 
+            max-height: 65vh; 
+            position: relative;
+        }
+        table { 
+            border-collapse: separate; 
+            border-spacing: 0; 
+            width: 100%; 
+            min-width: 1400px;
+        }
 
-    try {
-      const res = await fetch(`/api/nursing/users/search?q=${encodeURIComponent(q)}`);
-      const data = await res.json().catch(() => ({}));
+        /* COLUNAS FIXAS (NOME, CARGO, HORARIO) - CORRIGIDAS */
+        .st-col { 
+            position: sticky; 
+            background: var(--bg-card) !important; 
+            z-index: 20; 
+            border-right: 1px solid var(--border); 
+            border-bottom: 1px solid var(--border);
+            padding: 10px 12px !important;
+            font-size: 0.8rem;
+        }
+        .col-name { 
+            left: 0; 
+            width: 200px;
+            min-width: 200px;
+            max-width: 200px;
+            z-index: 30;
+        }
+        .col-role { 
+            left: 200px; 
+            width: 100px;
+            min-width: 100px;
+            max-width: 100px;
+            z-index: 25;
+            text-align: center;
+        }
+        .col-hour { 
+            left: 300px;
+            width: 90px;
+            min-width: 90px;
+            max-width: 90px;
+            z-index: 25;
+            text-align: center;
+        }
 
-      if (!res.ok) {
-        searchResults.innerHTML = `<div class="alert danger">${data.error || "Erro na busca"}</div>`;
-        return;
-      }
+        /* CABEÇALHO - CORRIGIDO */
+        thead th { 
+            background: var(--bg-header); 
+            position: sticky; 
+            top: 0; 
+            z-index: 40; 
+            padding: 12px 6px !important; 
+            font-size: 0.7rem; 
+            font-weight: 800; 
+            color: var(--text-muted); 
+            text-transform: uppercase;
+            text-align: center;
+            min-width: 40px;
+            max-width: 40px;
+            border-right: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+        }
+        
+        /* DIA 01 - ESPECIAL */
+        th.day-01 {
+            min-width: 45px !important;
+            max-width: 45px !important;
+            padding: 12px 8px !important;
+            background: linear-gradient(135deg, rgba(61, 138, 255, 0.1) 0%, rgba(61, 138, 255, 0.05) 100%);
+        }
+        
+        /* Rótulos de Grupo (Ex: DIURNO PAR) */
+        .group-header-row td { 
+            background: #1e2532 !important; 
+            padding: 12px 20px; 
+            font-weight: 800; 
+            font-size: 0.75rem; 
+            color: var(--primary); 
+            text-transform: uppercase;
+            position: sticky;
+            top: 46px; /* altura do header */
+            z-index: 15;
+        }
 
-      const items = Array.isArray(data.items) ? data.items : [];
-      if (!items.length) {
-        searchResults.innerHTML = '<div class="muted">Nenhum resultado.</div>';
-        return;
-      }
+        /* CÉLULAS DOS DIAS */
+        .cell { 
+            padding: 6px 2px; 
+            text-align: center; 
+            border-right: 1px solid var(--border); 
+            border-bottom: 1px solid var(--border);
+            min-width: 40px;
+            max-width: 40px;
+            height: 52px;
+            vertical-align: middle;
+        }
+        
+        /* CÉLULA DO DIA 01 ESPECIAL */
+        .cell.day-01-cell {
+            min-width: 45px !important;
+            max-width: 45px !important;
+            padding: 6px 4px;
+        }
+        
+        /* SELECT DE TURNO */
+        .shift-select {
+            width: 36px; 
+            height: 36px; 
+            border-radius: 8px; 
+            border: 1px solid transparent;
+            text-align: center; 
+            font-weight: 800; 
+            font-size: 0.7rem; 
+            cursor: pointer;
+            transition: all 0.2s; 
+            background: rgba(255,255,255,0.03); 
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+        }
+        .shift-select:focus { 
+            outline: none; 
+            border-color: var(--primary); 
+            box-shadow: 0 0 0 2px rgba(61, 138, 255, 0.2);
+        }
+        
+        /* CORES DOS TURNOS */
+        .shift-D { 
+            background: rgba(16, 185, 129, 0.15) !important; 
+            color: #34d399 !important; 
+            border: 1px solid rgba(16, 185, 129, 0.3); 
+        }
+        .shift-N { 
+            background: rgba(59, 130, 246, 0.15) !important; 
+            color: #60a5fa !important; 
+            border: 1px solid rgba(59, 130, 246, 0.3); 
+        }
+        .shift-FO { 
+            background: rgba(239, 68, 68, 0.1) !important; 
+            color: #f87171 !important; 
+        }
+        
+        /* FIM DE SEMANA */
+        .weekend { 
+            background: rgba(239, 68, 68, 0.03) !important; 
+        }
+        
+        /* INFO DO PROFISSIONAL */
+        .prof-name {
+            font-weight: 700;
+            font-size: 0.85rem;
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .prof-matricula {
+            font-size: 0.65rem; 
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+        
+        .prof-cargo {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .prof-horario {
+            font-size: 0.7rem;
+            color: var(--text-main);
+            font-weight: 600;
+            white-space: nowrap;
+        }
 
-      searchResults.innerHTML = `
-        <div class="list">
-          ${items.map(u => `
-            <div class="list-item" style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-              <div>
-                <div><strong>${escapeHtml(u.name || "")}</strong>
-                  <span class="muted">(${escapeHtml(u.matricula || "—")})</span>
-                </div>
-                <div class="muted">
-                  Setor: ${escapeHtml(u.sector_name || "—")}
-                  • Turno: ${escapeHtml(u.turno || "—")}
-                  • Cargo: ${escapeHtml(u.role_label || "—")}
-                </div>
-              </div>
-
-              <button class="btn small pick-user"
-                type="button"
-                data-user-id="${Number(u.id || 0)}"
-                data-user-name="${escapeAttr(u.name || "")}"
-                data-user-sector-id="${Number(u.sector_id || 0)}"
-                data-user-sector-name="${escapeAttr(u.sector_name || "")}">
-                Adicionar
-              </button>
+        /* MODAL */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: var(--bg-card);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: white;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+        
+        .user-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .user-item {
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .user-item:hover {
+            background: rgba(61, 138, 255, 0.1);
+            border-color: var(--primary);
+        }
+        
+        .close-modal {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+        
+        .close-modal:hover {
+            background: rgba(255,255,255,0.05);
+            color: white;
+        }
+        
+        /* LOADING */
+        .loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255,255,255,0.1);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="glass-header">
+            <div class="header-info">
+                <h1>Editor de Escala</h1>
+                <p>{{ active_sector.name }} • {{ month_label }} / {{ ano }}</p>
             </div>
-          `).join("")}
+            <div style="display:flex; gap:12px;">
+                <button class="btn btn-primary" onclick="window.print()">
+                    <i class="fas fa-print"></i> Imprimir PDF
+                </button>
+                <button class="btn btn-secondary" onclick="limparFiltros()">
+                    <i class="fas fa-filter-circle-xmark"></i> Limpar Filtros
+                </button>
+            </div>
+        </header>
+
+        <!-- Botões de Ação -->
+        <div class="action-buttons">
+            <button class="btn btn-success" onclick="importarSetor()">
+                <i class="fas fa-users"></i> Importar Setor
+            </button>
+            <button class="btn btn-warning" onclick="abrirModalAdicionar()">
+                <i class="fas fa-user-plus"></i> Adicionar Individual
+            </button>
+            <button class="btn btn-primary" onclick="autoPreencher()">
+                <i class="fas fa-magic"></i> Auto-preenchimento
+            </button>
         </div>
-      `;
-    } catch (err) {
-      searchResults.innerHTML = '<div class="alert danger">Erro de rede ao buscar.</div>';
-    }
-  }
 
-  if (btnSearchUser) btnSearchUser.addEventListener("click", doSearch);
-  if (searchUser) {
-    searchUser.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        doSearch();
-      }
-    });
-  }
+        <!-- Filtros -->
+        <div class="filter-toolbar">
+            <div class="filter-group">
+                <label>Cargo</label>
+                <select id="fCargo" class="control-input">
+                    <option value="all">Todos</option>
+                    <option value="Enfermeiro">Enfermeiros</option>
+                    <option value="Tecnico">Técnicos</option>
+                    <option value="Outros">Outros</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Turno</label>
+                <select id="fTurno" class="control-input">
+                    <option value="all">Todos</option>
+                    <option value="DIURNO">Diurno</option>
+                    <option value="NOTURNO">Noturno</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Nome</label>
+                <input type="text" id="fNome" class="control-input" placeholder="Pesquisar por nome...">
+            </div>
+        </div>
 
-  document.addEventListener("click", async (e) => {
-    const btn = e.target.closest(".pick-user");
-    if (!btn) return;
+        <!-- Tabela Principal -->
+        <div class="scale-card">
+            <div class="scroll-area">
+                <table id="escalaTable">
+                    <thead>
+                        <tr>
+                            <th class="st-col col-name" style="top: 0;">Profissional</th>
+                            <th class="st-col col-role" style="top: 0;">Cargo</th>
+                            <th class="st-col col-hour" style="top: 0;">Horario</th>
+                            {% for day in days %}
+                            <th class="day-header {% if day.day == 1 %}day-01{% endif %} {% if day.is_weekend %}weekend{% endif %}">
+                                {{ "%02d"|format(day.day) }}<br>
+                                <small style="font-size: 0.6rem;">{{ day.label }}</small>
+                            </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in rows %}
+                        <tr class="group-header-row">
+                            <td colspan="{{ 3 + days|length }}">
+                                {% if row.group_type == 'day' %}
+                                    <i class="fas fa-sun"></i>
+                                {% elif row.group_type == 'night' %}
+                                    <i class="fas fa-moon"></i>
+                                {% else %}
+                                    <i class="fas fa-cog"></i>
+                                {% endif %}
+                                {{ row.title }}
+                            </td>
+                        </tr>
+                        
+                        {% for member in row.members %}
+                        <tr class="row-prof" 
+                            data-cargo="{{ member.cargo_filter if member.cargo_filter else 'Outros' }}" 
+                            data-turno="{{ member.turno_filter if member.turno_filter else 'DIURNO' }}" 
+                            data-nome="{{ member.name }}"
+                            data-user-id="{{ member.user_id }}">
+                            
+                            <td class="st-col col-name">
+                                <div class="prof-name">{{ member.name }}</div>
+                                <div class="prof-matricula">{{ member.matricula }}</div>
+                            </td>
+                            <td class="st-col col-role">
+                                <div class="prof-cargo">
+                                    {% if member.cargo %}
+                                        {{ member.cargo }}
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="st-col col-hour">
+                                <div class="prof-horario">{{ member.horario }}</div>
+                            </td>
+                            
+                            {% for day in days %}
+                            {% set shift = member.cells.get(day.day, '') %}
+                            <td class="cell {% if day.day == 1 %}day-01-cell{% endif %} {% if day.is_weekend %}weekend{% endif %}">
+                                <select class="shift-select shift-{{ shift }}" 
+                                        data-user-id="{{ member.user_id }}" 
+                                        data-day="{{ day.day }}">
+                                    <option value="">--</option>
+                                    <option value="D" {% if shift == 'D' %}selected{% endif %}>D</option>
+                                    <option value="N" {% if shift == 'N' %}selected{% endif %}>N</option>
+                                    <option value="FO" {% if shift == 'FO' %}selected{% endif %}>FO</option>
+                                </select>
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 
-    const userId = Number(btn.dataset.userId || 0);
-    const userName = btn.dataset.userName || "";
-    const userSectorId = Number(btn.dataset.userSectorId || 0);
-    const userSectorName = btn.dataset.userSectorName || "";
+    <!-- Modal para Adicionar Colaborador -->
+    <div id="modalAdicionar" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="font-size: 1.2rem; font-weight: 700;">
+                    <i class="fas fa-user-plus"></i> Adicionar Colaborador
+                </h3>
+                <button class="close-modal" onclick="fecharModalAdicionar()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="text" 
+                       id="searchUser" 
+                       class="search-input" 
+                       placeholder="Digite nome ou matrícula..." 
+                       onkeyup="buscarUsuarios(this.value)">
+                <div id="userList" class="user-list">
+                    <!-- Lista de usuários aparecerá aqui -->
+                </div>
+            </div>
+        </div>
+    </div>
 
-    if (!userId) return;
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading">
+        <div class="spinner"></div>
+        <div style="color: white; font-weight: 600;">Processando...</div>
+    </div>
 
-    if (userSectorId && userSectorId !== sectorId) {
-      document.getElementById("ctName").textContent = userName || "—";
-      document.getElementById("ctFromSector").textContent = userSectorName || `Setor ${userSectorId}`;
-      document.getElementById("ctUserId").value = String(userId);
-      document.getElementById("ctUserSectorId").value = String(userSectorId);
-      document.getElementById("ctNotes").value = "";
-      openModal("#modalConfirmTransfer");
-      return;
-    }
+    <script>
+        // ============================================
+        // FILTROS
+        // ============================================
+        function filtrar() {
+            const cargo = document.getElementById('fCargo').value;
+            const turno = document.getElementById('fTurno').value.toUpperCase();
+            const nome = document.getElementById('fNome').value.toLowerCase().trim();
 
-    await addUserToSchedule(userId);
-  });
+            document.querySelectorAll('.row-prof').forEach(row => {
+                const rowCargo = row.getAttribute('data-cargo') || '';
+                const rowTurno = row.getAttribute('data-turno') || '';
+                const rowNome = row.getAttribute('data-nome') || '';
+                
+                const matchCargo = (cargo === 'all' || rowCargo === cargo);
+                const matchTurno = (turno === 'ALL' || rowTurno === turno);
+                const matchNome = (nome === '' || rowNome.toLowerCase().includes(nome));
+                
+                row.style.display = (matchCargo && matchTurno && matchNome) ? '' : 'none';
+            });
 
-  async function addUserToSchedule(userId) {
-    try {
-      const res = await fetch(`/api/nursing/monthly/${scheduleId}/add_user_auto`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId })
-      });
-
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        alert(j.error || "Falha ao adicionar");
-        return;
-      }
-
-      closeModal("#modalAdd");
-      location.reload();
-    } catch (err) {
-      alert("Erro de rede ao adicionar.");
-    }
-  }
-
-  const confirmTransfer = document.getElementById("confirmTransfer");
-  if (confirmTransfer) {
-    confirmTransfer.addEventListener("click", async () => {
-      const userId = Number(document.getElementById("ctUserId").value || 0);
-      const notes = (document.getElementById("ctNotes").value || "").trim();
-
-      try {
-        const res = await fetch(`/api/nursing/transfer`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            user_id: userId,
-            to_sector_id: sectorId,
-            year: year,
-            month: month,
-            schedule_id: scheduleId,
-            notes: notes
-          })
-        });
-
-        const j = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          alert(j.error || "Falha ao transferir");
-          return;
+            // Esconde grupos vazios
+            document.querySelectorAll('.group-header-row').forEach(group => {
+                let proximaLinha = group.nextElementSibling;
+                let temVisivel = false;
+                
+                while (proximaLinha && !proximaLinha.classList.contains('group-header-row')) {
+                    if (proximaLinha.style.display !== 'none') {
+                        temVisivel = true;
+                        break;
+                    }
+                    proximaLinha = proximaLinha.nextElementSibling;
+                }
+                
+                group.style.display = temVisivel ? '' : 'none';
+            });
         }
 
-        closeModal("#modalConfirmTransfer");
-        closeModal("#modalAdd");
-        location.reload();
-      } catch (err) {
-        alert("Erro de rede ao transferir.");
-      }
-    });
-  }
+        function limparFiltros() {
+            document.getElementById('fCargo').value = 'all';
+            document.getElementById('fTurno').value = 'all';
+            document.getElementById('fNome').value = '';
+            filtrar();
+        }
 
-  document.addEventListener("click", (e) => {
-    const btn = e.target.closest('[data-open-transfer="1"]');
-    if (!btn) return;
-    console.log('Editar profissional:', btn.dataset);
-  });
+        // ============================================
+        // SALVAMENTO DE CÉLULAS
+        // ============================================
+        document.addEventListener('DOMContentLoaded', function() {
+            // Event listeners para filtros
+            document.getElementById('fCargo').addEventListener('change', filtrar);
+            document.getElementById('fTurno').addEventListener('change', filtrar);
+            document.getElementById('fNome').addEventListener('input', filtrar);
+            
+            // Event listeners para selects de turno
+            document.querySelectorAll('.shift-select').forEach(select => {
+                select.addEventListener('change', async function() {
+                    const valor = this.value;
+                    this.className = `shift-select shift-${valor}`;
+                    
+                    try {
+                        const response = await fetch(`/nursing/api/monthly/{{ schedule_id }}/cell`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                user_id: this.dataset.userId,
+                                day: this.dataset.day,
+                                shift: valor
+                            })
+                        });
+                        
+                        if (!response.ok) {
+                            console.error('Erro ao salvar célula');
+                        }
+                    } catch (error) {
+                        console.error('Erro:', error);
+                    }
+                });
+            });
+            
+            filtrar(); // Filtro inicial
+        });
 
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-  }
+        // ============================================
+        // FUNÇÕES DE IMPORTAR/ADICIONAR
+        // ============================================
+        async function importarSetor() {
+            if (!confirm('Importar todos os colaboradores do setor?\nIsso adicionará todos os profissionais ativos.')) {
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const response = await fetch(`/nursing/api/monthly/{{ schedule_id }}/import_sector`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ auto_fill: false })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`✅ ${data.imported || data.message} colaboradores importados com sucesso!`);
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    alert('❌ Erro ao importar colaboradores');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('❌ Erro de conexão');
+            } finally {
+                hideLoading();
+            }
+        }
 
-  function escapeAttr(str) {
-    return escapeHtml(str).replace(/`/g, '&#096;');
-  }
-})();
-</script>
+        function abrirModalAdicionar() {
+            document.getElementById('modalAdicionar').style.display = 'flex';
+            document.getElementById('searchUser').focus();
+            buscarUsuarios(''); // Busca inicial vazia
+        }
 
-{% endblock %}
+        function fecharModalAdicionar() {
+            document.getElementById('modalAdicionar').style.display = 'none';
+            document.getElementById('searchUser').value = '';
+            document.getElementById('userList').innerHTML = '';
+        }
+
+        async function buscarUsuarios(query) {
+            if (query.length < 2 && query !== '') {
+                document.getElementById('userList').innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">Digite pelo menos 2 caracteres</p>';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/nursing/api/users/search?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                
+                const userList = document.getElementById('userList');
+                userList.innerHTML = '';
+                
+                if (data.items && data.items.length > 0) {
+                    data.items.forEach(user => {
+                        const userDiv = document.createElement('div');
+                        userDiv.className = 'user-item';
+                        userDiv.innerHTML = `
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-weight: 700;">${user.name}</div>
+                                    <div style="font-size: 0.8rem; color: var(--text-muted);">
+                                        ${user.matricula} • ${user.role_label || 'Sem cargo'}
+                                    </div>
+                                </div>
+                                <button class="btn" onclick="adicionarUsuario(${user.id})" 
+                                        style="padding: 6px 12px; font-size: 0.75rem;">
+                                    <i class="fas fa-plus"></i> Adicionar
+                                </button>
+                            </div>
+                        `;
+                        userList.appendChild(userDiv);
+                    });
+                } else {
+                    userList.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">Nenhum usuário encontrado</p>';
+                }
+            } catch (error) {
+                console.error('Erro na busca:', error);
+            }
+        }
+
+        async function adicionarUsuario(userId) {
+            showLoading();
+            
+            try {
+                // Primeiro, adiciona como membro da escala
+                const response = await fetch(`/nursing/api/monthly/{{ schedule_id }}/add_member`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Depois, faz auto-preenchimento baseado no turno
+                    await fetch(`/nursing/api/monthly/{{ schedule_id }}/auto_fill`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            user_id: userId,
+                            pattern: 'auto' // Determina paridade automaticamente
+                        })
+                    });
+                    
+                    alert('✅ Colaborador adicionado e escala preenchida!');
+                    fecharModalAdicionar();
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    alert('❌ Erro ao adicionar colaborador');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('❌ Erro de conexão');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function autoPreencher() {
+            if (!confirm('Deseja fazer auto-preenchimento para todos os colaboradores?\nIsso preencherá os dias automaticamente baseado no turno.')) {
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const response = await fetch(`/nursing/api/monthly/{{ schedule_id }}/auto_fill_all`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`✅ ${data.message || 'Auto-preenchimento realizado!'}`);
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    alert('❌ Erro no auto-preenchimento');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('❌ Erro de conexão');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ============================================
+        // FUNÇÕES AUXILIARES
+        // ============================================
+        function showLoading() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        // Fechar modal com ESC
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                fecharModalAdicionar();
+            }
+        });
+    </script>
+</body>
+</html>

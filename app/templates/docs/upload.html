@@ -1,34 +1,99 @@
 ﻿{% extends "layouts/base.html" %}
+
 {% block content %}
-  <h1>Novo documento</h1>
-  <form method="post" enctype="multipart/form-data">
-    {{ form.csrf_token }}
-    <div class="grid">
-      <div>
-        <label>Título</label>
-        {{ form.titulo(class_="input") }}
-      </div>
-      <div>
-        <label>Tipo</label>
-        {{ form.tipo(class_="input") }}
-      </div>
-      <div>
-        <label>Setor</label>
-        {{ form.setor(class_="input") }}
-      </div>
-      <div>
-        <label>Tags</label>
-        {{ form.tags(class_="input") }}
-      </div>
-      <div style="grid-column:1/-1;">
-        <label>Arquivo</label>
-        {{ form.arquivo(class_="input") }}
-      </div>
+<div class="page-header">
+    <div class="header-title">
+        <h1><i data-lucide="folder-open"></i> Documentos</h1>
+        <p>Base de conhecimento e protocolos.</p>
     </div>
-    <button class="btn" type="submit">{{ form.submit.label.text }}</button>
-  </form>
+    {% if current_user.role in ['manager','admin'] %}
+    <div class="header-actions">
+        <a href="{{ url_for('docs.report') }}" class="btn secondary">
+            <i data-lucide="bar-chart-2"></i> Relatório
+        </a>
+        <a href="{{ url_for('docs.upload') }}" class="btn primary">
+            <i data-lucide="plus"></i> Novo Documento
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card-table">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Documento</th>
+                <th>Setor</th>
+                <th>Versão</th>
+                <th>Data</th>
+                <th>Acessos</th>
+                <th style="text-align: right;">Ação</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for d in docs %}
+            {% set stats = reads_map.get(d.id, {'users': 0, 'opens': 0}) %}
+            <tr>
+                <td>
+                    <div class="doc-info">
+                        <div class="doc-icon">
+                            {% if d.tipo == 'POP' %} <i data-lucide="file-text" style="color: #60a5fa;"></i>
+                            {% elif d.tipo == 'Protocolo' %} <i data-lucide="shield" style="color: #4ade80;"></i>
+                            {% else %} <i data-lucide="file" style="color: #94a3b8;"></i>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <span class="doc-title">{{ d.titulo }}</span>
+                            <span class="doc-subtitle">{{ d.tipo }}</span>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    {% if d.setor %}<span class="badge">{{ d.setor }}</span>
+                    {% else %}<span class="badge ghost">Geral</span>{% endif %}
+                </td>
+                <td><span class="badge outline">v1</span></td>
+                <td style="color: #94a3b8;">{{ d.created_at.strftime('%d/%m/%Y') }}</td>
+                <td>
+                    <div class="stats-pill" title="Total de aberturas: {{ stats.opens }}">
+                        <i data-lucide="users" size="14"></i> {{ stats.users }}
+                    </div>
+                </td>
+                <td style="text-align: right;">
+                    <a href="{{ url_for('docs.view', doc_id=d.id) }}" class="btn small">Abrir</a>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" class="empty-state">
+                    <i data-lucide="folder-x"></i>
+                    <p>Nenhum documento encontrado.</p>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<style>
+.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+.header-actions { display: flex; gap: 10px; }
+.card-table { background: #1e293b; border-radius: 12px; border: 1px solid #334155; overflow: hidden; }
+.table { width: 100%; border-collapse: collapse; }
+.table th { background: #0f172a; color: #94a3b8; text-align: left; padding: 1rem; font-weight: 600; border-bottom: 1px solid #334155; }
+.table td { padding: 1rem; border-bottom: 1px solid #334155; color: #f1f5f9; vertical-align: middle; }
+.doc-info { display: flex; align-items: center; gap: 12px; }
+.doc-title { display: block; font-weight: 600; font-size: 0.95rem; }
+.doc-subtitle { font-size: 0.8rem; color: #94a3b8; }
+.badge { background: #334155; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; color: #e2e8f0; }
+.badge.ghost { background: transparent; border: 1px dashed #475569; color: #64748b; }
+.badge.outline { background: transparent; border: 1px solid #475569; }
+.stats-pill { display: inline-flex; align-items: center; gap: 6px; color: #94a3b8; font-size: 0.85rem; background: #0f172a; padding: 4px 8px; border-radius: 6px; }
+.btn.small { background: #334155; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 0.85rem; }
+.btn.small:hover { background: #2563eb; }
+.btn.secondary { background: #334155; color: white; padding: 0.6rem 1.2rem; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
+.btn.primary { background: #2563eb; color: white; padding: 0.6rem 1.2rem; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
+.empty-state { text-align: center; padding: 4rem; color: #64748b; }
+.empty-state i { width: 48px; height: 48px; margin-bottom: 10px; opacity: 0.5; }
+</style>
 {% endblock %}
-
-
-
-

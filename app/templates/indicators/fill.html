@@ -1,0 +1,40 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+<div class="dash">
+    <div class="page-head">
+        <h1>Lançamento de Indicadores</h1>
+        <p class="muted">Preencha os dados do plantão atual</p>
+    </div>
+
+    <form method="POST" class="panel">
+        {{ form.hidden_tag() }}
+        <div class="dash-grid" style="grid-template-columns: 1fr 1fr; gap: 30px;">
+            <div class="dash-left">
+                <h3 style="margin-bottom: 15px; color: var(--primary);">Acessos e Sondas</h3>
+                {{ form.lpp_total.label }} {{ form.lpp_total(class="input") }}
+                {{ form.svd_total.label }} {{ form.svd_total(class="input") }}
+                {{ form.sne_gtt_total.label }} {{ form.sne_gtt_total(class="input") }}
+                {{ form.cvc_cdl_total.label }} {{ form.cvc_cdl_total(class="input") }}
+                {{ form.avp_total.label }} {{ form.avp_total(class="input") }}
+            </div>
+            <div class="dash-right">
+                <h3 style="margin-bottom: 15px; color: var(--danger);">Segurança e Críticos</h3>
+                {{ form.quedas.label }} {{ form.quedas(class="input") }}
+                {{ form.erros_med.label }} {{ form.erros_med(class="input") }}
+                {{ form.paradas.label }} {{ form.paradas(class="input") }}
+                {{ form.obitos.label }} {{ form.obitos(class="input") }}
+                {{ form.encaminhado_uti.label }} {{ form.encaminhado_uti(class="input") }}
+            </div>
+        </div>
+        
+        <div style="margin-top: 25px;">
+            {{ form.observacoes.label }}
+            {{ form.observacoes(class="input", rows="3") }}
+        </div>
+
+        <button type="submit" class="btn primary" style="width: 100%; margin-top: 20px;">
+            Finalizar e Salvar Plantão
+        </button>
+    </form>
+</div>
+{% endblock %}

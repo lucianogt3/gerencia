@@ -3,7 +3,6 @@
 {% block content %}
   <div class="dash">
 
-    <!-- Cabeçalho -->
     <div class="page-head">
       <div class="page-head-left">
         <h1>Painel</h1>
@@ -15,19 +14,17 @@
       </div>
 
       <div class="head-actions">
-        <a class="btn" href="{{ url_for('nursing_ui.daily_page') }}">Escala Diária</a>
+        <a class="btn" href="{{ url_for('nursing_ui.daily') }}">Escala Diária</a>
 
         {% if current_user.role in ["manager","admin"] %}
           <a class="btn secondary" href="{{ url_for('nursing_ui.year_view') }}">Escala Mensal</a>
-          <a class="btn secondary" href="{{ url_for('settings.sectors') }}">Configurações</a>
+          <a class="btn secondary" href="{{ url_for('nursing_ui.manager_dashboard') }}">Painel de Indicadores</a>
         {% endif %}
 
-        <!-- Perfil em página própria -->
         <a class="btn secondary" href="{{ url_for('settings.profile') }}">Meu perfil</a>
       </div>
     </div>
 
-    <!-- KPIs (operacional) -->
     <div class="kpis">
       {% if current_user.role in ["manager","admin"] %}
         <div class="card kpi">
@@ -50,10 +47,8 @@
       </div>
     </div>
 
-    <!-- Grid principal -->
     <div class="dash-grid">
 
-      <!-- ESQUERDA -->
       <div class="dash-left">
 
         {% if current_user.role in ["manager","admin"] %}
@@ -73,10 +68,9 @@
                     <tr>
                       <th>Nome</th>
                       <th>Matrícula</th>
-                      <th>E-mail</th>
                       <th>Setor</th>
                       <th>Turno</th>
-                      <th style="width:240px;">Ações</th>
+                      <th style="width:180px; text-align:right;">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -84,18 +78,16 @@
                       <tr>
                         <td><strong>{{ u.nome }}</strong></td>
                         <td>{{ u.matricula }}</td>
-                        <td class="muted">{{ u.email or "—" }}</td>
                         <td>{{ u.setor or "—" }}</td>
                         <td>{{ u.turno or "—" }}</td>
-                        <td class="actions">
-                          <form method="post" action="{{ url_for('auth.approve_user', user_id=u.id) }}">
+                        <td class="actions" style="text-align:right;">
+                          <form method="post" action="{{ url_for('auth.approve_user', user_id=u.id) }}" style="display:inline;">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button class="btn small" type="submit">Aprovar</button>
+                            <button class="btn small success" type="submit">✔</button>
                           </form>
-
-                          <form method="post" action="{{ url_for('auth.block_user', user_id=u.id) }}">
+                          <form method="post" action="{{ url_for('auth.block_user', user_id=u.id) }}" style="display:inline;">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button class="btn small secondary" type="submit">Bloquear</button>
+                            <button class="btn small danger" type="submit">✖</button>
                           </form>
                         </td>
                       </tr>
@@ -103,19 +95,12 @@
                   </tbody>
                 </table>
               </div>
-
-              {% if pending_count and pending_count > (pending_list|length) %}
-                <p class="muted" style="margin-top:10px;">
-                  Mostrando {{ pending_list|length }} de {{ pending_count }} pendentes.
-                </p>
-              {% endif %}
             {% else %}
-              <p class="muted" style="margin-top:10px;">Nenhuma solicitação pendente.</p>
+              <p class="muted" style="padding:15px;">Nenhuma solicitação pendente.</p>
             {% endif %}
           </section>
         {% endif %}
 
-        <!-- Atalhos em cards -->
         <section class="panel">
           <div class="panel-head">
             <div>
@@ -125,61 +110,53 @@
           </div>
 
           <div class="quick-actions">
-  {% if current_user.role in ["manager","admin"] %}
-    <a class="qa" href="{{ url_for('nursing_ui.year_view') }}">
-      <div class="qa-emoji"><i data-lucide="calendar-range"></i></div>
-      <div>
-        <div class="qa-title">Escala Mensal</div>
-        <div class="qa-desc">Criar, editar e publicar por setor</div>
+            {% if current_user.role in ["manager","admin"] %}
+              <a class="qa" href="{{ url_for('nursing_ui.year_view') }}">
+                <div class="qa-emoji">📅</div>
+                <div>
+                  <div class="qa-title">Escala Mensal</div>
+                  <div class="qa-desc">Criar, editar e publicar</div>
+                </div>
+              </a>
+            {% endif %}
+
+            <a class="qa" href="{{ url_for('nursing_ui.daily') }}">
+              <div class="qa-emoji">📋</div>
+              <div>
+                <div class="qa-title">Escala Diária</div>
+                <div class="qa-desc">Falta • Atestado • Extra/Folga</div>
+              </div>
+            </a>
+
+            <a class="qa" href="{{ url_for('nursing_ui.manager_dashboard') }}" style="border-left: 3px solid #d8b4fe;">
+              <div class="qa-emoji">📊</div>
+              <div>
+                <div class="qa-title">Indicadores e Gestão</div>
+                <div class="qa-desc">Faltas, Cooperativa e Banco de Horas</div>
+              </div>
+            </a>
+
+            <a class="qa" href="{{ url_for('announcements.index') }}">
+              <div class="qa-emoji">📢</div>
+              <div>
+                <div class="qa-title">Comunicados</div>
+                <div class="qa-desc">Mural de avisos</div>
+              </div>
+            </a>
+
+            {% if current_user.role in ["manager","admin"] %}
+              <a class="qa" href="{{ url_for('settings.users') }}">
+                <div class="qa-emoji">👥</div>
+                <div>
+                  <div class="qa-title">Colaboradores</div>
+                  <div class="qa-desc">Gerenciar equipe</div>
+                </div>
+              </a>
+            {% endif %}
+          </div>
+        </section>
       </div>
-    </a>
-  {% endif %}
 
-  <a class="qa" href="{{ url_for('nursing_ui.daily_page') }}">
-    <div class="qa-emoji"><i data-lucide="calendar-days"></i></div>
-    <div>
-      <div class="qa-title">Escala Diária</div>
-      <div class="qa-desc">Falta • Atestado • Remanejamento • Extra/Folga</div>
-    </div>
-  </a>
-
-  <a class="qa" href="{{ url_for('announcements.index') }}">
-    <div class="qa-emoji"><i data-lucide="file-text"></i></div>
-    <div>
-      <div class="qa-title">Documentos</div>
-      <div class="qa-desc">POPs, protocolos, comunicados</div>
-    </div>
-  </a>
-
-  <a class="qa" href="{{ url_for('swaps.index') }}">
-    <div class="qa-emoji"><i data-lucide="repeat-2"></i></div>
-    <div>
-      <div class="qa-title">Trocas</div>
-      <div class="qa-desc">Solicitações e histórico</div>
-    </div>
-  </a>
-
-  <a class="qa" href="{{ url_for('indicators.index') }}">
-    <div class="qa-emoji"><i data-lucide="bar-chart-3"></i></div>
-    <div>
-      <div class="qa-title">Indicadores</div>
-      <div class="qa-desc">Painéis e relatórios</div>
-    </div>
-  </a>
-
-  {% if current_user.role in ["manager","admin"] %}
-    <a class="qa" href="{{ url_for('settings.users') }}">
-      <div class="qa-emoji"><i data-lucide="users"></i></div>
-      <div>
-        <div class="qa-title">Colaboradores</div>
-        <div class="qa-desc">Ativar/Inativar • setor • turno • perfil</div>
-      </div>
-    </a>
-  {% endif %}
-</div>
-
-
-      <!-- DIREITA -->
       <div class="dash-right">
         <section class="panel">
           <div class="panel-head">
@@ -197,22 +174,21 @@
                   <div class="list-top">
                     <strong class="tag">[{{ a.tipo|upper }}]</strong>
                     <span class="list-title">{{ a.title }}</span>
-                    {% if a.setor %}<span class="pill">{{ a.setor }}</span>{% endif %}
                   </div>
-                  {% if a.body %}<div class="muted">{{ a.body }}</div>{% endif %}
+                  {% if a.body %}<div class="muted" style="font-size:0.85rem;">{{ a.body|truncate(60) }}</div>{% endif %}
                 </li>
               {% endfor %}
             </ul>
           {% else %}
-            <p class="muted">Nenhum aviso ainda.</p>
+            <p class="muted" style="padding:15px;">Nenhum aviso ainda.</p>
           {% endif %}
         </section>
 
         <section class="panel">
           <div class="panel-head">
             <div>
-              <h2>Aniversariantes do mês</h2>
-              <div class="muted">Equipe cadastrada</div>
+              <h2>Aniversariantes</h2>
+              <div class="muted">Deste mês</div>
             </div>
           </div>
 
@@ -229,14 +205,26 @@
               {% endfor %}
             </ul>
           {% else %}
-            <p class="muted">Nenhum aniversariante cadastrado neste mês.</p>
+            <p class="muted" style="padding:15px;">Nenhum aniversariante.</p>
           {% endif %}
         </section>
       </div>
 
     </div>
   </div>
+
+  <style>
+    /* Estilos Adicionais para Botões de Ação */
+    .qa {
+      display: flex; align-items: center; gap: 15px; padding: 15px;
+      background: #1e1e1e; border: 1px solid #333; border-radius: 12px;
+      text-decoration: none; color: inherit; transition: all 0.2s;
+    }
+    .qa:hover { background: #252525; transform: translateY(-2px); border-color: #555; }
+    .qa-emoji { font-size: 1.5rem; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: #2a2a2a; border-radius: 8px; }
+    .qa-title { font-weight: bold; font-size: 1rem; color: #fff; }
+    .qa-desc { font-size: 0.8rem; color: #888; }
+    
+    .status-dot { height: 10px; width: 10px; background-color: #10b981; border-radius: 50%; display: inline-block; margin-right: 5px; }
+  </style>
 {% endblock %}
-
-
-

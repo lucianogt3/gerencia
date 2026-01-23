@@ -1,22 +1,30 @@
 ﻿from __future__ import annotations
 from datetime import datetime
-from ..extensions import db
+from app.extensions import db
 
 class Document(db.Model):
     __tablename__ = "documents"
 
     id = db.Column(db.Integer, primary_key=True)
     titulo = db.Column(db.String(200), nullable=False)
-    tipo = db.Column(db.String(30), nullable=False)  # POP/Protocolo/Politica/Checklist
+    tipo = db.Column(db.String(30), nullable=False)
     setor = db.Column(db.String(80), nullable=True)
     tags = db.Column(db.String(200), nullable=True)
 
-    status = db.Column(db.String(20), default="draft", nullable=False, index=True)  # draft/review/approved/archived
+    status = db.Column(db.String(20), default="active", nullable=False, index=True) 
     current_version_id = db.Column(db.Integer, db.ForeignKey("document_versions.id"), nullable=True)
 
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relacionamentos para facilitar o acesso
+    versions = db.relationship("DocumentVersion", backref="document", foreign_keys="DocumentVersion.document_id", lazy="dynamic")
+    reads = db.relationship("DocumentRead", backref="document", lazy="dynamic")
+    
+    # Propriedade para pegar a versão atual direto
+    current_version = db.relationship("DocumentVersion", foreign_keys=[current_version_id], post_update=True)
+
 
 class DocumentVersion(db.Model):
     __tablename__ = "document_versions"
@@ -30,6 +38,7 @@ class DocumentVersion(db.Model):
 
     uploaded_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
 
 class DocumentRead(db.Model):
     __tablename__ = "document_reads"
@@ -45,6 +54,3 @@ class DocumentRead(db.Model):
     __table_args__ = (
         db.UniqueConstraint("document_id", "user_id", name="uq_doc_user_read"),
     )
-
-
-

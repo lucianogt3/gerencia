@@ -1,6 +1,21 @@
+# Python
 .venv/
 __pycache__/
 *.pyc
-instance/app.db
-instance/uploads/
+
+# Ambiente
 .env
+.env.*
+
+# Instance
+instance/
+instance/*.db
+instance/uploads/
+
+# Backups e cópias
+*.bak
+*copy*
+*.old
+
+# Cache
+.cache/
