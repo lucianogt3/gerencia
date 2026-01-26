@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 from __future__ import annotations
+=======
+﻿from __future__ import annotations
+>>>>>>> 0dfc06d (Atualizações no projeto)
 
 from datetime import date, datetime, timedelta
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
@@ -81,6 +85,10 @@ def indicators_home():
         ]:
             getattr(form, attr).data = getattr(existing, attr) or 0
         form.observacoes.data = existing.observacoes or ""
+<<<<<<< HEAD
+=======
+        
+>>>>>>> 0dfc06d (Atualizações no projeto)
 
     if form.validate_on_submit():
         try:

@@ -1,0 +1,669 @@
+﻿{% extends "layouts/base.html" %}
+{% block content %}
+
+<div class="dash">
+
+  <!-- CabeÃ§alho -->
+  <div class="page-head">
+    <div class="page-head-left">
+      <a class="muted" href="{{ url_for('nursing_ui.month_details', ano=ano, mes=mes) }}">â† Voltar para o Mês</a>
+      <h1>ðŸ—“ï¸ Escala Mensal</h1>
+      <div class="muted">
+        Setor: {{ active_sector.name if active_sector else "â€”" }}
+        â€¢ {{ "%02d"|format(mes) }}/{{ ano }}
+        â€¢ Status: {{ status or "draft" }}
+      </div>
+    </div>
+
+    <div class="head-actions">
+      <button class="btn" type="button" id="btnImportSector">ðŸ‘¥ Importar ativos do setor</button>
+      <button class="btn primary" type="button" id="btnAddProfessional">âž• Adicionar profissional</button>
+      <button class="btn" type="button" disabled title="PDF depois">â¬‡ï¸ Exportar PDF</button>
+    </div>
+  </div>
+
+  <!-- Editor de Escala -->
+  <div class="card" style="margin-top:12px;">
+    <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <div>
+        <div style="font-weight:700;">Escala â€¢ {{ "%02d"|format(mes) }}/{{ ano }}</div>
+        <div class="muted" style="margin-top:2px;">Clique em um profissional para editar / mover / remover</div>
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn" type="button" id="btnImportSector2">ðŸ‘¥ Importar</button>
+        <button class="btn primary" type="button" id="btnAddProfessional2">âž• Adicionar</button>
+      </div>
+    </div>
+
+    <!-- Grade -->
+    <div class="table-wrap" style="margin-top:12px;overflow:auto;border-radius:12px;border:1px solid rgba(255,255,255,.08);">
+      <table class="table" style="min-width:980px;">
+        <thead>
+          <tr>
+            <th style="position:sticky;left:0;z-index:2;background:var(--card);min-width:260px;">
+              Profissional / Regra
+            </th>
+
+            {% for d in range(1, (days|length) + 1) %}
+              <th style="text-align:center;min-width:34px;">{{ "%02d"|format(d) }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+
+        <tbody>
+          {% if rows is defined and rows|length %}
+            {% for group in rows %}
+
+              <tr>
+                <td colspan="{{ 1 + (days|length) }}"
+                    style="padding:10px 12px;font-weight:800;background:rgba(255,255,255,.04);">
+                  {{ group["title"] if group is mapping and group.get("title") else "â€”" }}
+                </td>
+              </tr>
+
+              {% set items = (group.get("items") if group is mapping else []) %}
+              {% for r in items %}
+                <tr class="row-prof">
+                  <td style="position:sticky;left:0;z-index:1;background:var(--card);">
+                    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                      <div>
+                        <div style="font-weight:700;">{{ r.get("name","â€”") }}</div>
+                        <div class="muted" style="font-size:.85rem;">
+                          {{ r.get("rule_label","â€”") }} â€¢ {{ r.get("matricula","â€”") }}
+                        </div>
+                      </div>
+
+                      <!-- âš™ï¸ abre modal de aÃ§Ãµes -->
+                      <button class="btn small btn-actions"
+                        type="button"
+                        data-user-id="{{ r.get('user_id',0) }}"
+                        data-user-name="{{ r.get('name','') }}">
+                        âš™ï¸
+                      </button>
+                    </div>
+                  </td>
+
+                  {% set cells = r.get("cells", {}) %}
+                  {% for d in range(1, (days|length) + 1) %}
+                    {% set cell = cells.get(d) if cells is mapping else None %}
+                    <td class="cell"
+                      style="text-align:center;cursor:pointer;"
+                      data-user-id="{{ r.get('user_id',0) }}"
+                      data-day="{{ d }}"
+                      data-current="{{ (cell or 'â€”') }}">
+                      {% if cell %}
+                        <span class="pill">{{ cell }}</span>
+                      {% else %}
+                        <span class="muted">â€”</span>
+                      {% endif %}
+                    </td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="{{ 1 + (days|length) }}" class="muted" style="padding:14px;">
+                Nenhum profissional ainda. Use â€œImportarâ€ ou â€œAdicionarâ€.
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- legenda dentro do card -->
+    <div class="muted" style="padding:10px 12px;border-top:1px solid rgba(255,255,255,.08);font-size:.9rem;">
+      <strong>Legenda:</strong>
+      D=Diurno â€¢ N=Noturno â€¢ F=Folga â€¢ FE=FÃ©rias â€¢ FT=Falta â€¢ AT=Atestado â€¢ LC=LicenÃ§a â€¢ EX=Extra â€¢ CB=Cobertura â€¢ RM=Remanejamento â€¢ â€”=Limpar
+    </div>
+
+  </div>
+</div>
+
+
+<!-- =========================
+  MODAL: Importar Setor
+========================= -->
+<div class="modal" id="modalImport" aria-hidden="true">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>Importar ativos do setor</h3>
+      <button class="icon-btn" type="button" data-close="#modalImport">âœ•</button>
+    </div>
+
+    <div class="modal-body">
+      <p class="muted">
+        Isso vai adicionar TODOS os colaboradores ativos do setor
+        <strong>{{ active_sector.name if active_sector else "â€”" }}</strong>.
+      </p>
+
+      <label class="check" style="display:flex;gap:10px;align-items:center;margin-top:10px;">
+        <input type="checkbox" id="importAutoFill" checked>
+        <span>Auto preencher Mês (par/Ã­mpar, diurno/noturno)</span>
+      </label>
+
+      <div class="alert warn" style="margin-top:12px;">
+        Se o colaborador estiver em outro setor no mesmo Mês, use o modal "Adicionar profissional"
+        para transferir com confirmaÃ§Ã£o.
+      </div>
+
+      <div id="sectorUsersBox" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn" type="button" data-close="#modalImport">Cancelar</button>
+      <button class="btn primary" type="button" id="confirmImport">Importar agora</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- =========================
+  MODAL: Adicionar Profissional
+========================= -->
+<div class="modal" id="modalAdd" aria-hidden="true">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>Adicionar profissional</h3>
+      <button class="icon-btn" type="button" data-close="#modalAdd">âœ•</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="row" style="display:flex;gap:10px;align-items:end;">
+        <div style="flex:1;">
+          <label>Buscar (nome ou matrÃ­cula)</label>
+          <input class="input" id="searchUser" placeholder="Ex: Luciano ou 12345" type="search">
+        </div>
+        <button class="btn" type="button" id="btnSearchUser">Buscar</button>
+      </div>
+
+      <div id="searchResults" style="margin-top:12px;">
+        <div class="muted">Digite e clique em Buscar.</div>
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn" type="button" data-close="#modalAdd">Fechar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- =========================
+  MODAL: Confirmar TransferÃªncia
+========================= -->
+<div class="modal" id="modalConfirmTransfer" aria-hidden="true">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>Confirmar transferÃªncia</h3>
+      <button class="icon-btn" type="button" data-close="#modalConfirmTransfer">âœ•</button>
+    </div>
+
+    <div class="modal-body">
+      <p>
+        O profissional <strong id="ctName">â€”</strong> estÃ¡ em outro setor:
+        <strong id="ctFromSector">â€”</strong>.
+      </p>
+
+      <p class="muted" style="margin-top:6px;">
+        Ao confirmar, ele serÃ¡ removido da escala do setor anterior neste Mês e adicionado aqui.
+      </p>
+
+      <label style="margin-top:10px;display:block;">Motivo (opcional)</label>
+      <input class="input" id="ctNotes" placeholder="Ex: Cobertura, remanejamento, apoio...">
+
+      <input type="hidden" id="ctUserId">
+      <input type="hidden" id="ctUserSectorId">
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn" type="button" data-close="#modalConfirmTransfer">Cancelar</button>
+      <button class="btn danger" type="button" id="confirmTransfer">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- =========================
+  MODAL: AÃ§Ãµes do Profissional (âš™ï¸)
+========================= -->
+<div class="modal" id="modalMemberActions" aria-hidden="true">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>AÃ§Ãµes do profissional</h3>
+      <button class="icon-btn" type="button" data-close="#modalMemberActions">âœ•</button>
+    </div>
+
+    <div class="modal-body">
+      <p style="margin:0;">
+        Profissional: <strong id="maName">â€”</strong>
+      </p>
+      <p class="muted" style="margin-top:6px;">
+        Remover da escala desativa o membro neste Mês (nÃ£o apaga o usuÃ¡rio do sistema).
+      </p>
+
+      <input type="hidden" id="maUserId">
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn" type="button" data-close="#modalMemberActions">Fechar</button>
+      <button class="btn danger" type="button" id="btnRemoveFromSchedule">Remover da escala</button>
+    </div>
+  </div>
+</div>
+<!-- =========================
+  MODAL: Editar cÃ©lula (Shift)
+========================= -->
+<div class="modal" id="modalCell" aria-hidden="true">
+  <div class="modal-card" style="max-width:720px;">
+    <div class="modal-head">
+      <h3>Editar cÃ³digo do dia</h3>
+      <button class="icon-btn" type="button" data-close="#modalCell">âœ•</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="muted" style="margin-bottom:10px;">
+        Profissional: <strong id="cellUserName">â€”</strong> â€¢ Dia: <strong id="cellDay">â€”</strong> â€¢ Atual: <strong id="cellCurrent">â€”</strong>
+      </div>
+
+      <div class="shift-grid" id="shiftGrid"></div>
+
+      <div class="muted" style="margin-top:10px;font-size:.9rem;">
+        D=Diurno â€¢ N=Noturno â€¢ F=Folga â€¢ FE=FÃ©rias â€¢ FT=Falta â€¢ AT=Atestado â€¢ LC=LicenÃ§a â€¢ EX=Extra â€¢ CB=Cobertura â€¢ RM=Remanejamento â€¢ â€”=Limpar
+      </div>
+
+      <input type="hidden" id="cellUserId">
+      <input type="hidden" id="cellDayVal">
+      <input type="hidden" id="cellShiftVal">
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn" type="button" data-close="#modalCell">Cancelar</button>
+      <button class="btn primary" type="button" id="btnSaveCell">Salvar</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+(function () {
+  const scheduleId = Number("{{ schedule_id|default(0) }}");
+  const sectorId   = Number("{{ active_sector_id|default(0) }}");
+  const year       = Number("{{ ano|default(0) }}");
+  const month      = Number("{{ mes|default(0) }}");
+
+  // cÃ³digos permitidos (mÃ¡x 2 letras)
+  const SHIFT_CODES = ["D","N","F","FE","FT","AT","LC","EX","CB","RM","—"];
+
+  const SHIFT_HELP =
+    "D  Diurno\n" +
+    "N  Noturno\n" +
+    "F  Folga\n" +
+    "FE FÃ©rias\n" +
+    "FT Falta\n" +
+    "AT Atestado\n" +
+    "LC LicenÃ§a\n" +
+    "EX Extra\n" +
+    "CB Cobertura\n" +
+    "RM Remanejamento\n" +
+    "â€”  Limpar";
+
+  function openModal(sel) {
+    const el = document.querySelector(sel);
+    if (!el) return;
+    el.setAttribute("aria-hidden", "false");
+    el.classList.add("open");
+  }
+
+  function closeModal(sel) {
+    const el = document.querySelector(sel);
+    if (!el) return;
+    el.setAttribute("aria-hidden", "true");
+    el.classList.remove("open");
+  }
+
+  document.addEventListener("click", (e) => {
+    const closeBtn = e.target.closest("[data-close]");
+    if (closeBtn) closeModal(closeBtn.getAttribute("data-close"));
+  });
+
+  async function apiFetch(url, opts = {}) {
+    const res = await fetch(url, {
+      credentials: "same-origin",
+      headers: {
+        "Accept": "application/json",
+        ...(opts.headers || {}),
+      },
+      ...opts,
+    });
+
+    const redirectedToLogin = res.redirected && (res.url || "").includes("/auth/login");
+    if (res.status === 401 || redirectedToLogin) {
+      window.location.href = "/auth/login";
+      throw new Error("Unauthorized");
+    }
+    return res;
+  }
+
+  // BotÃµes topo
+  const btnImportSector1 = document.getElementById("btnImportSector");
+  const btnImportSector2 = document.getElementById("btnImportSector2");
+  const btnAddProfessional1 = document.getElementById("btnAddProfessional");
+  const btnAddProfessional2 = document.getElementById("btnAddProfessional2");
+
+  if (btnAddProfessional1) btnAddProfessional1.addEventListener("click", () => openModal("#modalAdd"));
+  if (btnAddProfessional2) btnAddProfessional2.addEventListener("click", () => openModal("#modalAdd"));
+  if (btnImportSector1) btnImportSector1.addEventListener("click", openImportModal);
+  if (btnImportSector2) btnImportSector2.addEventListener("click", openImportModal);
+
+  // Importar setor
+  const confirmImport = document.getElementById("confirmImport");
+  if (confirmImport) {
+    confirmImport.addEventListener("click", async () => {
+      const autoFill = document.getElementById("importAutoFill")?.checked ?? true;
+
+      try {
+        const res = await apiFetch(`/api/nursing/monthly/${scheduleId}/import_sector`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ auto_fill: autoFill }),
+        });
+
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) return alert(j.error || "Falha ao importar setor");
+
+        closeModal("#modalImport");
+        location.reload();
+      } catch (err) {
+        alert("Erro de rede ao importar setor.");
+      }
+    });
+  }
+
+  // Buscar usuários (modal add)
+  const btnSearchUser = document.getElementById("btnSearchUser");
+  const searchUser = document.getElementById("searchUser");
+  const searchResults = document.getElementById("searchResults");
+
+  async function doSearch() {
+    const q = (searchUser?.value || "").trim();
+    if (!searchResults) return;
+
+    if (!q) {
+      searchResults.innerHTML = '<div class="muted">Digite algo para buscar.</div>';
+      return;
+    }
+
+    searchResults.innerHTML = '<div class="muted">Buscando...</div>';
+
+    try {
+      const res = await apiFetch(`/api/nursing/users/search?q=${encodeURIComponent(q)}`);
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        searchResults.innerHTML = `<div class="alert danger">${data.error || "Erro na busca"}</div>`;
+        return;
+      }
+
+      const items = Array.isArray(data.items) ? data.items : (Array.isArray(data) ? data : []);
+      if (!items.length) {
+        searchResults.innerHTML = '<div class="muted">Nenhum resultado.</div>';
+        return;
+      }
+
+      searchResults.innerHTML = `
+        <div class="list">
+          ${items.map(u => `
+            <div class="list-item" style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+              <div>
+                <div><strong>${escapeHtml(u.name || "")}</strong>
+                  <span class="muted">(${escapeHtml(u.matricula || "â€”")})</span>
+                </div>
+                <div class="muted">
+                  Setor: ${escapeHtml(u.sector_name || "â€”")}
+                  â€¢ Turno: ${escapeHtml(u.turno || "â€”")}
+                  â€¢ Cargo: ${escapeHtml(u.role_label || u.role || "â€”")}
+                </div>
+              </div>
+
+              <button class="btn small pick-user"
+                type="button"
+                data-user-id="${Number(u.id || 0)}"
+                data-user-name="${escapeAttr(u.name || "")}"
+                data-user-sector-id="${Number(u.sector_id || 0)}"
+                data-user-sector-name="${escapeAttr(u.sector_name || "")}">
+                Adicionar
+              </button>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    } catch (err) {
+      searchResults.innerHTML = '<div class="alert danger">Erro de rede ao buscar.</div>';
+    }
+  }
+
+  if (btnSearchUser) btnSearchUser.addEventListener("click", doSearch);
+  if (searchUser) {
+    searchUser.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        doSearch();
+      }
+    });
+  }
+
+  // clique "Adicionar" na busca
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".pick-user");
+    if (!btn) return;
+
+    const userId = Number(btn.dataset.userId || 0);
+    const userName = btn.dataset.userName || "";
+    const userSectorId = Number(btn.dataset.userSectorId || 0);
+    const userSectorName = btn.dataset.userSectorName || "";
+
+    if (!userId) return;
+
+    if (userSectorId && userSectorId !== sectorId) {
+      document.getElementById("ctName").textContent = userName || "â€”";
+      document.getElementById("ctFromSector").textContent = userSectorName || `Setor ${userSectorId}`;
+      document.getElementById("ctUserId").value = String(userId);
+      document.getElementById("ctUserSectorId").value = String(userSectorId);
+      document.getElementById("ctNotes").value = "";
+      openModal("#modalConfirmTransfer");
+      return;
+    }
+
+    await addUserToSchedule(userId);
+  });
+
+  async function addUserToSchedule(userId) {
+    try {
+      const res = await apiFetch(`/api/nursing/monthly/${scheduleId}/add_user_auto`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId }),
+      });
+
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) return alert(j.error || "Falha ao adicionar");
+
+      closeModal("#modalAdd");
+      location.reload();
+    } catch (err) {
+      alert("Erro de rede ao adicionar.");
+    }
+  }
+
+  // confirmar transferÃªncia
+  const confirmTransfer = document.getElementById("confirmTransfer");
+  if (confirmTransfer) {
+    confirmTransfer.addEventListener("click", async () => {
+      const userId = Number(document.getElementById("ctUserId").value || 0);
+      const notes = (document.getElementById("ctNotes").value || "").trim();
+
+      try {
+        const res = await apiFetch(`/api/nursing/transfer`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: userId,
+            to_sector_id: sectorId,
+            year: year,
+            month: month,
+            schedule_id: scheduleId,
+            notes: notes,
+          }),
+        });
+
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) return alert(j.error || "Falha ao transferir");
+
+        closeModal("#modalConfirmTransfer");
+        closeModal("#modalAdd");
+        location.reload();
+      } catch (err) {
+        alert("Erro de rede ao transferir.");
+      }
+    });
+  }
+
+  // carregar usuários do setor (modal Importar)
+  async function openImportModal() {
+    openModal("#modalImport");
+
+    const box = document.getElementById("sectorUsersBox");
+    if (!box) return;
+
+    box.innerHTML = "<div class='muted'>Carregando usuários...</div>";
+
+    try {
+      const res = await apiFetch(`/api/nursing/monthly/${scheduleId}/sector_users`);
+      const users = await res.json().catch(() => []);
+
+      if (!Array.isArray(users) || !users.length) {
+        box.innerHTML = "<div class='muted'>Nenhum usuÃ¡rio ativo no setor.</div>";
+        return;
+      }
+
+      box.innerHTML = users.map(u => `
+        <label class="user-row ${u.already_in ? 'is-in' : ''}" style="display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.08);margin-bottom:8px;">
+          <input type="checkbox" class="ucheck" value="${u.id}" ${u.already_in ? "checked disabled" : ""} style="margin-top:3px;">
+          <div class="uinfo" style="flex:1;">
+            <div class="uname" style="font-weight:700;">${escapeHtml(u.name || "")}</div>
+            <div class="umeta muted" style="font-size:.9rem;">
+              ${escapeHtml(u.matricula || "â€”")} â€¢ ${escapeHtml(u.role_label || u.role || "â€”")}
+            </div>
+          </div>
+          ${u.already_in ? "<span class='pill'>JÃ¡ na escala</span>" : ""}
+        </label>
+      `).join("");
+    } catch (err) {
+      box.innerHTML = "<div class='alert danger'>Erro ao carregar usuários do setor.</div>";
+    }
+  }
+
+  // =========================
+  // CLIQUE NA CÃ‰LULA (salvar shift) â€” usa /monthly/<id>/cell
+  // =========================
+  document.addEventListener("click", async (e) => {
+    const td = e.target.closest("td.cell");
+    if (!td) return;
+
+    const userId = Number(td.dataset.userId || 0);
+    const day = Number(td.dataset.day || 0);
+    const current = (td.dataset.current || "â€”").trim().toUpperCase();
+
+    if (!scheduleId || !userId || !day) return;
+
+    const novoRaw = prompt(
+      `CÃ³digo da escala (mÃ¡x 2 letras):\n\n${SHIFT_HELP}\n\nAtual: ${current}`,
+      current === "â€”" ? "D" : current
+    );
+    if (novoRaw === null) return;
+
+    const novo = (novoRaw || "").trim().toUpperCase().slice(0, 2) || "â€”";
+    if (!SHIFT_CODES.includes(novo)) {
+      alert("CÃ³digo invÃ¡lido. Use apenas: " + SHIFT_CODES.join(", "));
+      return;
+    }
+
+    try {
+      const res = await apiFetch(`/api/nursing/monthly/${scheduleId}/cell`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        const shiftToSend = (novo === "—") ? "" : novo;
+      body: JSON.stringify({ user_id: userId, day: day, shift: shiftToSend }),
+      });
+
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) return alert(j.error || "Falha ao salvar cÃ©lula");
+
+      td.dataset.current = novo;
+      td.innerHTML = (novo === "â€”")
+        ? `<span class="muted">â€”</span>`
+        : `<span class="pill">${escapeHtml(novo)}</span>`;
+    } catch (err) {
+      alert("Erro de rede ao salvar cÃ©lula.");
+    }
+  });
+
+  // =========================
+  // âš™ï¸ AÃ§Ãµes do profissional
+  // =========================
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".btn-actions");
+    if (!btn) return;
+
+    const userId = Number(btn.dataset.userId || 0);
+    const userName = btn.dataset.userName || "â€”";
+
+    document.getElementById("maName").textContent = userName;
+    document.getElementById("maUserId").value = String(userId);
+
+    openModal("#modalMemberActions");
+  });
+
+  const btnRemove = document.getElementById("btnRemoveFromSchedule");
+  if (btnRemove) {
+    btnRemove.addEventListener("click", async () => {
+      const userId = Number(document.getElementById("maUserId").value || 0);
+      if (!userId) return;
+
+      if (!confirm("Remover este profissional da escala deste Mês?")) return;
+
+      try {
+        const res = await apiFetch(`/api/nursing/monthly/${scheduleId}/remove_member`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: userId, clear_cells: true }),
+        });
+
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) return alert(j.error || "Falha ao remover");
+
+        closeModal("#modalMemberActions");
+        location.reload();
+      } catch (err) {
+        alert("Erro de rede ao remover.");
+      }
+    });
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = String(str ?? "");
+    return div.innerHTML;
+  }
+
+  function escapeAttr(str) {
+    return escapeHtml(str).replace(/`/g, "&#096;");
+  }
+})();
+</script>
+
+{% endblock %}
+

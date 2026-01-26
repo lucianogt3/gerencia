@@ -1,0 +1,325 @@
+from __future__ import annotations
+
+from flask import Blueprint, request, jsonify
+from flask_login import login_required, current_user
+from app.extensions import db
+from app.models import User, Sector, NursingMonthlySchedule, NursingMonthlyMember, NursingMonthlyCell
+
+bp = Blueprint("nursing_api", __name__, url_prefix="/api/nursing")
+
+
+def _require_manager() -> bool:
+    return getattr(current_user, "role", "") in ("manager", "admin")
+
+
+def _get_schedule_or_404(schedule_id: int):
+    sched = NursingMonthlySchedule.query.get(schedule_id)
+    if not sched:
+        return None, (jsonify({"error": "Escala não encontrada"}), 404)
+    return sched, None
+
+
+@bp.get("/users/search")
+@login_required
+def users_search():
+    """
+    Endpoint que o scale_editor.html chama:
+      GET /api/nursing/users/search?q=...
+    Retorna: { items: [ {id, name, matricula, sector_id, sector_name, turno, role_label} ] }
+    """
+    q = (request.args.get("q") or "").strip().lower()
+    if not q:
+        return jsonify({"items": []})
+
+    query = User.query
+
+    # só ativos se existir
+    if hasattr(User, "status"):
+        query = query.filter(User.status == "active")
+
+    # busca por nome/matrícula
+    # (ajuste se sua matrícula tiver outro nome)
+    conds = []
+    if hasattr(User, "nome"):
+        conds.append(User.nome.ilike(f"%{q}%"))
+    if hasattr(User, "matricula"):
+        conds.append(User.matricula.ilike(f"%{q}%"))
+
+    if conds:
+        from sqlalchemy import or_
+        query = query.filter(or_(*conds))
+
+    query = query.order_by(User.nome.asc()).limit(30)
+    users = query.all()
+
+    items = []
+    for u in users:
+        sec_name = None
+        sec_id = getattr(u, "sector_id", None)
+
+        if sec_id:
+            sec = Sector.query.get(sec_id)
+            sec_name = sec.name if sec else None
+
+        items.append({
+            "id": u.id,
+            "name": getattr(u, "nome", None),
+            "matricula": getattr(u, "matricula", None),
+            "sector_id": sec_id,
+            "sector_name": sec_name,
+            "turno": getattr(u, "turno", None),
+            "role_label": getattr(u, "role", None),
+        })
+
+    return jsonify({"items": items})
+
+
+@bp.post("/monthly/<int:schedule_id>/add_user_auto")
+@login_required
+def add_user_auto(schedule_id: int):
+    """
+    Endpoint que o scale_editor.html chama:
+      POST /api/nursing/monthly/<scheduleId>/add_user_auto
+    Body: { user_id }
+    """
+    if not _require_manager():
+        return jsonify({"error": "Sem permissão"}), 403
+
+    sched, err = _get_schedule_or_404(schedule_id)
+    if err:
+        return err
+
+    data = request.get_json(silent=True) or {}
+    user_id = int(data.get("user_id") or 0)
+    if not user_id:
+        return jsonify({"error": "user_id obrigatório"}), 400
+
+    u = User.query.get(user_id)
+    if not u:
+        return jsonify({"error": "Usuário não encontrado"}), 404
+
+    # já existe?
+    exists = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, user_id=u.id).first()
+    if exists:
+        return jsonify({"ok": True, "already": True})
+
+    db.session.add(NursingMonthlyMember(
+        schedule_id=sched.id,
+        user_id=u.id,
+        role=getattr(u, "role", "staff"),
+        position=9999,
+        active=True
+    ))
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
+@bp.post("/transfer")
+@login_required
+def transfer_user_between_sectors():
+    """
+    Endpoint que o scale_editor.html chama:
+      POST /api/nursing/transfer
+    Body: { user_id, to_sector_id, year, month, schedule_id, notes? }
+
+    Regra: remove o profissional de outra escala do mesmo mês/ano (se estiver),
+    e adiciona nesta escala (schedule_id).
+    """
+    if not _require_manager():
+        return jsonify({"error": "Sem permissão"}), 403
+
+    data = request.get_json(silent=True) or {}
+    user_id = int(data.get("user_id") or 0)
+    to_sector_id = int(data.get("to_sector_id") or 0)
+    year = int(data.get("year") or 0)
+    month = int(data.get("month") or 0)
+    schedule_id = int(data.get("schedule_id") or 0)
+
+    if not (user_id and to_sector_id and year and month and schedule_id):
+        return jsonify({"error": "Parâmetros obrigatórios ausentes"}), 400
+
+    # escala destino
+    sched = NursingMonthlySchedule.query.get(schedule_id)
+    if not sched:
+        return jsonify({"error": "Escala destino não encontrada"}), 404
+
+    # remove de qualquer outra escala no mesmo ano/mês (qualquer setor)
+    other_schedules = (NursingMonthlySchedule.query
+        .filter_by(year=year, month=month)
+        .all()
+    )
+
+    removed_from = []
+    for osched in other_schedules:
+        if osched.id == sched.id:
+            continue
+        m = NursingMonthlyMember.query.filter_by(schedule_id=osched.id, user_id=user_id).first()
+        if m:
+            db.session.delete(m)
+            removed_from.append(osched.id)
+
+            # opcional: apagar cells antigas desse usuário na escala antiga
+            NursingMonthlyCell.query.filter_by(schedule_id=osched.id, planned_user_id=user_id).delete()
+
+    # adiciona na escala destino se não existir
+    exists = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, user_id=user_id).first()
+    if not exists:
+        u = User.query.get(user_id)
+        if not u:
+            return jsonify({"error": "Usuário não encontrado"}), 404
+
+        db.session.add(NursingMonthlyMember(
+            schedule_id=sched.id,
+            user_id=u.id,
+            role=getattr(u, "role", "staff"),
+            position=9999,
+            active=True
+        ))
+
+    db.session.commit()
+    return jsonify({"ok": True, "removed_from": removed_from, "added_to": sched.id})
+def _get_schedule_or_404(schedule_id: int):
+    sched = NursingMonthlySchedule.query.get(schedule_id)
+    if not sched:
+        return None, (jsonify({"error": "Escala não encontrada"}), 404)
+    return sched, None
+
+
+@bp.get("/users/search")
+@login_required
+def users_search():
+    q = (request.args.get("q") or "").strip().lower()
+    if not q:
+        return jsonify({"items": []})
+
+    query = User.query
+
+    if hasattr(User, "status"):
+        query = query.filter(User.status == "active")
+
+    conds = []
+    if hasattr(User, "nome"):
+        conds.append(User.nome.ilike(f"%{q}%"))
+    if hasattr(User, "matricula"):
+        conds.append(User.matricula.ilike(f"%{q}%"))
+
+    if conds:
+        from sqlalchemy import or_
+        query = query.filter(or_(*conds))
+
+    query = query.order_by(User.nome.asc()).limit(30)
+    users = query.all()
+
+    items = []
+    for u in users:
+        sec_name = None
+        sec_id = getattr(u, "sector_id", None)
+
+        if sec_id:
+            sec = Sector.query.get(sec_id)
+            sec_name = sec.name if sec else None
+
+        items.append({
+            "id": u.id,
+            "name": getattr(u, "nome", None),
+            "matricula": getattr(u, "matricula", None),
+            "sector_id": sec_id,
+            "sector_name": sec_name,
+            "turno": getattr(u, "turno", None),
+            "role_label": getattr(u, "role", None),
+        })
+
+    return jsonify({"items": items})
+
+
+@bp.post("/monthly/<int:schedule_id>/add_user_auto")
+@login_required
+def add_user_auto(schedule_id: int):
+    if not _require_manager():
+        return jsonify({"error": "Sem permissão"}), 403
+
+    sched, err = _get_schedule_or_404(schedule_id)
+    if err:
+        return err
+
+    data = request.get_json(silent=True) or {}
+    user_id = int(data.get("user_id") or 0)
+    if not user_id:
+        return jsonify({"error": "user_id obrigatório"}), 400
+
+    u = User.query.get(user_id)
+    if not u:
+        return jsonify({"error": "Usuário não encontrado"}), 404
+
+    exists = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, user_id=u.id).first()
+    if exists:
+        return jsonify({"ok": True, "already": True})
+
+    db.session.add(NursingMonthlyMember(
+        schedule_id=sched.id,
+        user_id=u.id,
+        role=getattr(u, "role", "staff"),
+        position=9999,
+        active=True
+    ))
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
+@bp.post("/transfer")
+@login_required
+def transfer_user_between_sectors():
+    if not _require_manager():
+        return jsonify({"error": "Sem permissão"}), 403
+
+    data = request.get_json(silent=True) or {}
+    user_id = int(data.get("user_id") or 0)
+    to_sector_id = int(data.get("to_sector_id") or 0)
+    year = int(data.get("year") or 0)
+    month = int(data.get("month") or 0)
+    schedule_id = int(data.get("schedule_id") or 0)
+
+    if not (user_id and to_sector_id and year and month and schedule_id):
+        return jsonify({"error": "Parâmetros obrigatórios ausentes"}), 400
+
+    sched = NursingMonthlySchedule.query.get(schedule_id)
+    if not sched:
+        return jsonify({"error": "Escala destino não encontrada"}), 404
+
+    other_schedules = (NursingMonthlySchedule.query
+        .filter_by(year=year, month=month)
+        .all()
+    )
+
+    removed_from = []
+    for osched in other_schedules:
+        if osched.id == sched.id:
+            continue
+
+        m = NursingMonthlyMember.query.filter_by(schedule_id=osched.id, user_id=user_id).first()
+        if m:
+            db.session.delete(m)
+            removed_from.append(osched.id)
+            NursingMonthlyCell.query.filter_by(schedule_id=osched.id, planned_user_id=user_id).delete()
+
+    exists = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, user_id=user_id).first()
+    if not exists:
+        u = User.query.get(user_id)
+        if not u:
+            return jsonify({"error": "Usuário não encontrado"}), 404
+
+        db.session.add(NursingMonthlyMember(
+            schedule_id=sched.id,
+            user_id=u.id,
+            role=getattr(u, "role", "staff"),
+            position=9999,
+            active=True
+        ))
+
+    db.session.commit()
+    return jsonify({"ok": True, "removed_from": removed_from, "added_to": sched.id})
+def _get_schedule_or_404(schedule_id: int):
+    sched = NursingMonthlySchedule.query.get(schedule_id)
+    if not sched:
+        return None, (jsonify({"error": "Escala não encontrada"}), 404)
+    return sched, None

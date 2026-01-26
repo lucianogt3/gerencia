@@ -1,0 +1,443 @@
+from __future__ import annotations
+
+import calendar
+from datetime import datetime, date
+
+from flask import Blueprint, request, jsonify
+from flask_login import login_required, current_user
+from sqlalchemy import or_
+
+from app.extensions import db
+from app.models import (
+    Sector,
+    User,
+    NursingMonthlySchedule,
+    NursingMonthlyMember,
+    NursingMonthlyCell,
+    NursingDailyOverride,
+)
+
+bp = Blueprint("nursing_api", __name__, url_prefix="/api/nursing")
+
+DAY_STATUS = {
+    "OK", "FALTA", "ATESTADO", "FOLGA", "LICENCA",
+    "REMANEJAMENTO", "EXTRA", "COBERTURA",
+}
+
+def _require_manager() -> bool:
+    return getattr(current_user, "role", "") in ("manager", "admin")
+
+
+# =========================
+# USERS SEARCH (somente ativos)
+# =========================
+@bp.get("/users/search")
+@login_required
+def users_search():
+    q = (request.args.get("q") or "").strip()
+    sector_id = request.args.get("sector_id")  # opcional: filtrar por centro de custo
+
+    if not q:
+        return jsonify({"items": []})
+
+    query = User.query
+
+    # só ativos
+    if hasattr(User, "status"):
+        query = query.filter(User.status == "active")
+
+    # opcional: filtrar setor
+    if sector_id:
+        try:
+            sid = int(sector_id)
+            query = query.filter(User.sector_id == sid)
+        except Exception:
+            pass
+
+    conds = []
+    # Melhor regra: se for número, tenta matricula / id primeiro
+    if q.isdigit():
+        if hasattr(User, "matricula"):
+            conds.append(User.matricula.ilike(f"%{q}%"))
+        conds.append(User.id == int(q))
+    else:
+        if hasattr(User, "nome"):
+            conds.append(User.nome.ilike(f"%{q}%"))
+        if hasattr(User, "email"):
+            conds.append(User.email.ilike(f"%{q}%"))
+        if hasattr(User, "matricula"):
+            conds.append(User.matricula.ilike(f"%{q}%"))
+
+    query = query.filter(or_(*conds)).order_by(User.nome.asc()).limit(30)
+    users = query.all()
+
+    items = []
+    for u in users:
+        sec_id = getattr(u, "sector_id", None)
+        sec_name = None
+        if sec_id:
+            sec = Sector.query.get(sec_id)
+            sec_name = sec.name if sec else None
+
+        items.append({
+            "id": u.id,
+            "name": getattr(u, "nome", None),
+            "matricula": getattr(u, "matricula", None),
+            "email": getattr(u, "email", None),
+            "sector_id": sec_id,
+            "sector_name": sec_name,
+            "turno": getattr(u, "turno", None),
+            "role": getattr(u, "role", None),
+        })
+
+    return jsonify({"items": items})
+
+
+# =========================
+# SECTORS
+# =========================
+@bp.get("/sectors")
+@login_required
+def list_sectors():
+    sectors = Sector.query.filter_by(active=True).order_by(Sector.name.asc()).all()
+    return jsonify([{"id": s.id, "name": s.name} for s in sectors])
+
+
+@bp.post("/sectors")
+@login_required
+def create_sector():
+    if not _require_manager():
+        return jsonify({"error": "Sem permissão"}), 403
+
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Nome do setor é obrigatório"}), 400
+
+    exists = Sector.query.filter_by(name=name).first()
+    if exists:
+        return jsonify({"error": "Setor já existe"}), 409
+
+    s = Sector(name=name, active=True)
+    db.session.add(s)
+    db.session.commit()
+    return jsonify({"id": s.id, "name": s.name})
+
+
+# =========================
+# MONTHLY (create/get)
+# =========================
+@bp.post("/monthly")
+@login_required
+def create_or_get_monthly():
+    if not _require_manager():
+        return jsonify({"error": "Sem permissão"}), 403
+
+    data = request.get_json(silent=True) or {}
+    sector_id = int(data.get("sector_id") or 0)
+    year = int(data.get("year") or 0)
+    month = int(data.get("month") or 0)
+
+    if not sector_id or not year or month < 1 or month > 12:
+        return jsonify({"error": "sector_id/ano/mês inválidos"}), 400
+
+    sched = NursingMonthlySchedule.query.filter_by(sector_id=sector_id, year=year, month=month).first()
+
+    if not sched:
+        sched = NursingMonthlySchedule(
+            sector_id=sector_id,
+            year=year,
+            month=month,
+            status="draft",
+            created_by_id=getattr(current_user, "id", None),
+        )
+        db.session.add(sched)
+        db.session.commit()
+
+    return jsonify({
+        "id": sched.id,
+        "sector_id": sched.sector_id,
+        "year": sched.year,
+        "month": sched.month,
+        "status": sched.status
+    })
+
+
+@bp.get("/monthly/<int:schedule_id>")
+@login_required
+def get_monthly(schedule_id: int):
+    sched = NursingMonthlySchedule.query.get_or_404(schedule_id)
+    sector = Sector.query.get(sched.sector_id)
+
+    if getattr(current_user, "role", "") not in ("manager", "admin") and sched.status != "published":
+        return jsonify({"error": "Escala não publicada"}), 403
+
+    days_in_month = calendar.monthrange(sched.year, sched.month)[1]
+    members = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, active=True).all()
+    cells = NursingMonthlyCell.query.filter_by(schedule_id=sched.id).all()
+
+    member_rows = []
+    for m in sorted(members, key=lambda x: (x.role, x.position)):
+        u = User.query.get(m.user_id)
+        member_rows.append({
+            "id": m.id,
+            "user_id": m.user_id,
+            "name": getattr(u, "nome", None) if u else f"User {m.user_id}",
+            
+            "nome": getattr(u, "nome", None) if u else f"User {m.user_id}",
+            "user_name": getattr(u, "nome", None) if u else f"User {m.user_id}",
+            "label": getattr(u, "nome", None) if u else f"User {m.user_id}",
+            "matricula": getattr(u, "matricula", None) if u else None,
+"role": m.role,
+            "position": m.position,
+        })
+
+    cell_map = {}
+    for c in cells:
+        key = f"{c.day}:{c.shift}:{c.role}:{c.position}"
+        cell_map[key] = c.planned_user_id
+
+    return jsonify({
+        "schedule": {
+            "id": sched.id,
+            "sector": {"id": sector.id, "name": sector.name} if sector else None,
+            "year": sched.year,
+            "month": sched.month,
+            "status": sched.status,
+            "days_in_month": days_in_month
+        },
+        "members": member_rows,
+        "cells": cell_map
+    })
+
+
+# =========================
+# IMPORT SECTOR
+# =========================
+@bp.post("/monthly/<int:schedule_id>/import_sector")
+@login_required
+def import_sector(schedule_id: int):
+    if not _require_manager():
+        return jsonify({"error": "Sem permissão"}), 403
+
+    sched = NursingMonthlySchedule.query.get_or_404(schedule_id)
+
+    data = request.get_json(silent=True) or {}
+    auto_fill = bool(data.get("auto_fill", False))
+
+    q = User.query
+
+    # só ativos
+    if hasattr(User, "status"):
+        q = q.filter(User.status == "active")
+
+    # centro de custo do usuário deve bater com setor da escala
+    q = q.filter(User.sector_id == sched.sector_id)
+
+    users = q.order_by(User.nome.asc()).all()
+
+    added = 0
+    skipped = 0
+
+    def next_position(role: str) -> int:
+        last = (NursingMonthlyMember.query
+                .filter_by(schedule_id=sched.id, role=role, active=True)
+                .order_by(NursingMonthlyMember.position.desc())
+                .first())
+        return (last.position + 1) if last else 1
+
+    for u in users:
+        u_role = (getattr(u, "role", "") or "").lower()
+        role = "enfermeiro" if u_role in ("nurse", "enfermeiro") else "tecnico"
+
+        exists = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, user_id=u.id).first()
+        if exists:
+            skipped += 1
+            continue
+
+        db.session.add(NursingMonthlyMember(
+            schedule_id=sched.id,
+            user_id=u.id,
+            role=role,
+            position=next_position(role),
+            active=True,
+        ))
+        added += 1
+
+    db.session.commit()
+
+    return jsonify({
+        "ok": True,
+        "schedule_id": sched.id,
+        "sector_id": sched.sector_id,
+        "imported": added,
+        "skipped": skipped,
+        "auto_fill": auto_fill,
+    })
+
+# =========================
+# TRANSFER (add user to monthly schedule) - somente DRAFT
+# =========================
+@bp.post("/transfer")
+@login_required
+def transfer():
+    if not _require_manager():
+        return jsonify({"error": "Sem permissão"}), 403
+
+    data = request.get_json(silent=True) or {}
+    schedule_id = int(data.get("schedule_id") or 0)
+    user_id = int(data.get("user_id") or 0)
+
+    if not schedule_id or not user_id:
+        return jsonify({"error": "schedule_id e user_id são obrigatórios"}), 400
+
+    sched = NursingMonthlySchedule.query.get_or_404(schedule_id)
+
+    # 🔒 se publicado (histórico), não altera
+    if getattr(sched, "status", "") == "published":
+        return jsonify({"error": "Escala publicada. Não pode transferir/alterar."}), 409
+
+    u = User.query.get_or_404(user_id)
+
+    # define role do membro igual sua regra do import_sector
+    u_role = (getattr(u, "role", "") or "").lower()
+    role = "enfermeiro" if u_role in ("nurse", "enfermeiro") else "tecnico"
+
+    # se já existe, não duplica
+    exists = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, user_id=u.id).first()
+    if exists:
+        # se estava inativo, reativa (opcional, mas útil)
+        if hasattr(exists, "active") and not bool(exists.active):
+            exists.active = True
+            db.session.commit()
+        return jsonify({"ok": True, "message": "Usuário já está na escala do mês", "member_id": exists.id}), 200
+
+    # próxima posição por role (igual import_sector)
+    last = (NursingMonthlyMember.query
+            .filter_by(schedule_id=sched.id, role=role, active=True)
+            .order_by(NursingMonthlyMember.position.desc())
+            .first())
+    pos = (last.position + 1) if last else 1
+
+    m = NursingMonthlyMember(
+        schedule_id=sched.id,
+        user_id=u.id,
+        role=role,
+        position=pos,
+        active=True,
+    )
+    db.session.add(m)
+    db.session.commit()
+
+    return jsonify({"ok": True, "message": "Usuário transferido para a escala do mês", "member_id": m.id}), 200
+
+
+# =========================
+# PUBLISH
+# =========================
+@bp.post("/monthly/<int:schedule_id>/publish")
+@login_required
+def publish_monthly(schedule_id: int):
+    if not _require_manager():
+        return jsonify({"error": "Sem permissão"}), 403
+
+    sched = NursingMonthlySchedule.query.get_or_404(schedule_id)
+    sched.status = "published"
+    sched.published_at = datetime.utcnow()
+    sched.published_by_id = getattr(current_user, "id", None)
+    db.session.commit()
+    return jsonify({"ok": True})
+
+# =========================
+# TRANSFER (ADD MEMBER) - v2
+# aceita user_id OU matricula e padroniza role
+# =========================
+@bp.post("/transfer", endpoint="transfer_v2")
+@login_required
+def transfer_v2():
+    if not _require_manager():
+        return jsonify({"error": "Sem permissão"}), 403
+
+    data = request.get_json(silent=True) or {}
+    schedule_id = int(data.get("schedule_id") or 0)
+
+    # pode vir user_id (int) ou matricula (string/número)
+    user_raw = (data.get("user_id") or data.get("matricula") or data.get("q") or "")
+    user_raw = str(user_raw).strip()
+
+    reason = (data.get("reason") or "").strip() or None
+
+    if not schedule_id or not user_raw:
+        return jsonify({"error": "schedule_id e user_id/matricula são obrigatórios"}), 400
+
+    sched = NursingMonthlySchedule.query.get_or_404(schedule_id)
+
+    # 🔒 histórico travado
+    if getattr(sched, "status", "") == "published":
+        return jsonify({"error": "Escala publicada. Não pode alterar."}), 409
+
+    # resolve usuário: se numérico, tenta ID primeiro e depois matrícula
+    u = None
+    if user_raw.isdigit():
+        u = User.query.get(int(user_raw))
+        if not u and hasattr(User, "matricula"):
+            u = User.query.filter(User.matricula == user_raw).first()
+    else:
+        # fallback: tenta por e-mail/nome (se vier algo assim)
+        q = User.query
+        if hasattr(User, "email"):
+            q = q.filter(User.email.ilike(user_raw))
+        u = q.first()
+
+    if not u:
+        return jsonify({"error": "Usuário não encontrado"}), 404
+
+    # só ativos
+    if hasattr(u, "status") and u.status != "active":
+        return jsonify({"error": "Usuário está bloqueado/inativo"}), 409
+
+    # role técnico padronizado (o FRONT usa nurse/technician)
+    u_role = (getattr(u, "role", "") or "").lower()
+    member_role = "nurse" if u_role in ("nurse", "enfermeiro") else "technician"
+
+    # já existe?
+    exists = NursingMonthlyMember.query.filter_by(schedule_id=sched.id, user_id=u.id).first()
+    if exists:
+        # reativa se estava inativo
+        if hasattr(exists, "active") and not bool(exists.active):
+            exists.active = True
+            db.session.commit()
+            return jsonify({"ok": True, "already": True, "reactivated": True, "member_id": exists.id}), 200
+
+        return jsonify({"ok": True, "already": True, "member_id": exists.id, "message": "Usuário já está na escala"}), 200
+
+    # se veio de outro centro de custo e não informou motivo, exige
+    user_sector = getattr(u, "sector_id", None)
+    if user_sector and user_sector != sched.sector_id and not reason:
+        return jsonify({"error": "Informe o motivo do empréstimo (outro centro de custo)."}), 400
+
+    # próxima posição
+    last = (NursingMonthlyMember.query
+            .filter_by(schedule_id=sched.id, role=member_role, active=True)
+            .order_by(NursingMonthlyMember.position.desc())
+            .first())
+    pos = (last.position + 1) if last else 1
+
+    m = NursingMonthlyMember(
+        schedule_id=sched.id,
+        user_id=u.id,
+        role=member_role,
+        position=pos,
+        active=True,
+    )
+
+    # se seu model tiver campos de empréstimo, preenche
+    if hasattr(m, "borrow_reason"):
+        m.borrow_reason = reason
+    if hasattr(m, "borrow_from_sector_id"):
+        m.borrow_from_sector_id = user_sector
+
+    db.session.add(m)
+    db.session.commit()
+
+    return jsonify({"ok": True, "already": False, "member_id": m.id}), 200

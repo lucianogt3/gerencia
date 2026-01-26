@@ -1,6 +1,7 @@
 {% extends "layouts/base.html" %}
 {% block content %}
 <div class="dash">
+<<<<<<< HEAD
     <div class="page-head">
         <h1>Lançamento de Indicadores</h1>
         <p class="muted">Preencha os dados do plantão atual</p>
@@ -38,3 +39,105 @@
     </form>
 </div>
 {% endblock %}
+=======
+  <div class="page-head">
+    <div class="page-head-left">
+      <h1>📋 Lançamento Diário • Indicadores</h1>
+      <p class="muted">Data: {{ ref.strftime('%d/%m/%Y') }} • Unidade: {{ unit }}</p>
+    </div>
+
+    <div class="head-actions" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      <span class="pill">Status do dia: <b>{{ day_status }}</b></span>
+      <span class="pill">Diurno: {% if 'D' in shifts_present %}✅{% else %}❌{% endif %}</span>
+      <span class="pill">Noturno: {% if 'N' in shifts_present %}✅{% else %}❌{% endif %}</span>
+
+      <a class="btn btn-outline" href="{{ url_for('indicators.indicators_home', date=ref.strftime('%Y-%m-%d'), shift='D') }}">Ir para Diurno</a>
+      <a class="btn btn-outline" href="{{ url_for('indicators.indicators_home', date=ref.strftime('%Y-%m-%d'), shift='N') }}">Ir para Noturno</a>
+      <a class="btn btn-primary" href="{{ url_for('indicators.indicators_dashboard') }}">Dashboard</a>
+    </div>
+  </div>
+
+  <form method="POST" class="panel">
+    {{ form.hidden_tag() }}
+
+    <!-- Turno -->
+    <div class="panel" style="margin-bottom:16px;">
+      <div class="panel-body" style="display:flex; gap:16px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
+        <div style="min-width:260px;">
+          <label style="font-weight:800;">Turno do lançamento</label>
+          {{ form.shift(class="input", style="max-width:240px;") }}
+          <div class="muted" style="font-size:12px; margin-top:6px;">
+            O dia só fica <b>COMPLETO</b> quando existir lançamento de <b>Diurno</b> e <b>Noturno</b>.
+          </div>
+        </div>
+
+        <button type="submit" class="btn primary" style="min-width:240px; font-weight:900;">
+          ✅ Salvar (Turno)
+        </button>
+      </div>
+    </div>
+
+    <!-- Grid -->
+    <div class="dash-grid" style="grid-template-columns: repeat(2, 1fr); gap: 24px;">
+
+      <!-- Coluna 1 -->
+      <div class="panel">
+        <h3 style="color: var(--primary); margin-bottom: 15px;">LPP / Dispositivos</h3>
+
+        <div class="form-group"><label>{{ form.lpp_total.label }}</label>{{ form.lpp_total(class="input") }}</div>
+        <div class="form-group"><label>{{ form.lpp_admitidos.label }}</label>{{ form.lpp_admitidos(class="input") }}</div>
+        <div class="form-group"><label>{{ form.lpp_novos.label }}</label>{{ form.lpp_novos(class="input") }}</div>
+
+        <hr style="opacity:.15; margin:14px 0;">
+
+        <div class="form-group"><label>{{ form.svd_total.label }}</label>{{ form.svd_total(class="input") }}</div>
+        <div class="form-group"><label>{{ form.sne_gtt_total.label }}</label>{{ form.sne_gtt_total(class="input") }}</div>
+        <div class="form-group"><label>{{ form.perda_sne_gtt.label }}</label>{{ form.perda_sne_gtt(class="input") }}</div>
+
+        <div class="form-group"><label>{{ form.cvc_cdl_total.label }}</label>{{ form.cvc_cdl_total(class="input") }}</div>
+        <div class="form-group"><label>{{ form.perda_cvc_cdl.label }}</label>{{ form.perda_cvc_cdl(class="input") }}</div>
+
+        <div class="form-group"><label>{{ form.avp_total.label }}</label>{{ form.avp_total(class="input") }}</div>
+      </div>
+
+      <!-- Coluna 2 -->
+      <div class="panel">
+        <h3 style="color: var(--danger); margin-bottom: 15px;">Segurança / Eventos</h3>
+
+        <div class="form-group"><label>{{ form.flebite_infeccao_cvc_cdl.label }}</label>{{ form.flebite_infeccao_cvc_cdl(class="input") }}</div>
+        <div class="form-group"><label>{{ form.quedas.label }}</label>{{ form.quedas(class="input") }}</div>
+        <div class="form-group"><label>{{ form.erros_med.label }}</label>{{ form.erros_med(class="input") }}</div>
+        <div class="form-group"><label>{{ form.faltou_kit_medicacao.label }}</label>{{ form.faltou_kit_medicacao(class="input") }}</div>
+
+        <hr style="opacity:.15; margin:14px 0;">
+
+        <div class="form-group"><label>{{ form.pulseira_ok.label }}</label>{{ form.pulseira_ok(class="input") }}</div>
+        <div class="form-group"><label>{{ form.identificacao_incorreta.label }}</label>{{ form.identificacao_incorreta(class="input") }}</div>
+
+        <hr style="opacity:.15; margin:14px 0;">
+
+        <div class="form-group"><label>{{ form.encaminhado_uti.label }}</label>{{ form.encaminhado_uti(class="input") }}</div>
+        <div class="form-group"><label>{{ form.paradas.label }}</label>{{ form.paradas(class="input") }}</div>
+        <div class="form-group"><label>{{ form.obitos.label }}</label>{{ form.obitos(class="input") }}</div>
+      </div>
+    </div>
+
+    <!-- Observações -->
+    <div class="panel" style="margin-top: 20px;">
+      <h3>Observações</h3>
+      {{ form.observacoes(class="input", rows="3", placeholder="Intercorrências, pendências, observações do turno...") }}
+    </div>
+
+    <button type="submit" class="btn primary" style="width: 100%; margin-top: 20px; font-weight: 900;">
+      ✅ Salvar (Turno)
+    </button>
+  </form>
+</div>
+
+<style>
+/* Só pra garantir organização básica se seu base não tiver */
+.form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.pill{padding:6px 10px;border:1px solid rgba(255,255,255,.15);border-radius:999px;font-size:12px}
+</style>
+{% endblock %}
+>>>>>>> 0dfc06d (Atualizações no projeto)
