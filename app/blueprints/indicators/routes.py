@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-from __future__ import annotations
-=======
 ﻿from __future__ import annotations
->>>>>>> 0dfc06d (Atualizações no projeto)
 
 from datetime import date, datetime, timedelta
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
@@ -74,21 +70,17 @@ def indicators_home():
     # Preenche formulário com dados existentes no GET
     if existing and request.method == "GET":
         for attr in [
-            "lpp_total","lpp_admitidos","lpp_novos",
-            "svd_total","sne_gtt_total","perda_sne_gtt",
-            "cvc_cdl_total","perda_cvc_cdl",
+            "lpp_total", "lpp_admitidos", "lpp_novos",
+            "svd_total", "sne_gtt_total", "perda_sne_gtt",
+            "cvc_cdl_total", "perda_cvc_cdl",
             "avp_total",
             "flebite_infeccao_cvc_cdl",
-            "quedas","erros_med","faltou_kit_medicacao",
-            "pulseira_ok","identificacao_incorreta",
-            "encaminhado_uti","paradas","obitos",
+            "quedas", "erros_med", "faltou_kit_medicacao",
+            "pulseira_ok", "identificacao_incorreta",
+            "encaminhado_uti", "paradas", "obitos",
         ]:
             getattr(form, attr).data = getattr(existing, attr) or 0
         form.observacoes.data = existing.observacoes or ""
-<<<<<<< HEAD
-=======
-        
->>>>>>> 0dfc06d (Atualizações no projeto)
 
     if form.validate_on_submit():
         try:
