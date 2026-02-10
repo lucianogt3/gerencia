@@ -22,7 +22,7 @@
       <div class="flash-messages">
         {% for category, message in messages %}
           <div class="alert alert-{{ category }}">
-            <i data-lucide="{% if category == 'success' %}check-circle{% elif category == 'danger' %}alert-circle{% else %}info{% endif %}" 
+            <i data-lucide="{% if category == 'success' %}check-circle{% elif category == 'danger' %}alert-circle{% else %}info{% endif %}"
                style="width: 16px; height: 16px;"></i>
             {{ message }}
           </div>
@@ -37,26 +37,32 @@
       <div class="card-header">
         <h3><i data-lucide="user" style="width: 16px; height: 16px;"></i> Informações Pessoais</h3>
       </div>
+
       <div class="card-body">
         <form method="POST" action="{{ url_for('settings.update_profile') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          
+
+          {# preserva "next" caso venha do login #}
+          {% if request.args.get('next') %}
+            <input type="hidden" name="next" value="{{ request.args.get('next') }}">
+          {% endif %}
+
           <div class="form-grid">
             <!-- Nome Completo -->
             <div class="input-group">
               <label for="nome">Nome Completo *</label>
-              <input type="text" name="nome" id="nome" 
-                     class="form-control" 
-                     value="{{ user.nome }}" 
+              <input type="text" name="nome" id="nome"
+                     class="form-control"
+                     value="{{ user.nome or '' }}"
                      required>
             </div>
 
             <!-- Data de Nascimento -->
             <div class="input-group">
               <label for="data_nascimento">Data de Nascimento *</label>
-              <input type="date" name="data_nascimento" id="data_nascimento" 
-                     class="form-control" 
-                     value="{{ user.data_nascimento.strftime('%Y-%m-%d') if user.data_nascimento else '' }}" 
+              <input type="date" name="data_nascimento" id="data_nascimento"
+                     class="form-control"
+                     value="{{ user.nascimento.strftime('%Y-%m-%d') if user.nascimento else '' }}"
                      required>
               <div class="form-hint">Para controle de aniversariantes</div>
             </div>
@@ -64,9 +70,9 @@
             <!-- E-mail -->
             <div class="input-group">
               <label for="email">E-mail *</label>
-              <input type="email" name="email" id="email" 
-                     class="form-control" 
-                     value="{{ user.email or '' }}" 
+              <input type="email" name="email" id="email"
+                     class="form-control"
+                     value="{{ user.email or '' }}"
                      placeholder="seu@email.com"
                      required>
               <div class="form-hint">Para comunicação oficial</div>
@@ -75,38 +81,38 @@
             <!-- Telefone -->
             <div class="input-group">
               <label for="telefone">Telefone/WhatsApp</label>
-              <input type="tel" name="telefone" id="telefone" 
-                     class="form-control" 
-                     value="{{ user.telefone or '' }}" 
+              <input type="tel" name="telefone" id="telefone"
+                     class="form-control"
+                     value="{{ user.telefone or '' }}"
                      placeholder="(11) 99999-9999">
               <div class="form-hint">Contato preferencial</div>
             </div>
 
             <!-- Matrícula -->
             <div class="input-group">
-              <label for="matricula">Número da Matrícula *</label>
-              <input type="text" name="matricula" id="matricula" 
-                     class="form-control" 
-                     value="{{ user.matricula or '' }}" 
-                     pattern="[0-9]+"
-                     title="Apenas números são permitidos"
+              <label for="matricula">Matrícula / Usuário *</label>
+              <input type="text" name="matricula" id="matricula"
+                     class="form-control"
+                     value="{{ user.matricula or '' }}"
+                     pattern="[A-Za-z0-9._-]+"
+                     title="Use letras/números e . _ - (sem espaços)"
                      required>
-              <div class="form-hint">Apenas números (usado no formulário de troca)</div>
+              <div class="form-hint">Ex.: claudia100</div>
             </div>
 
             <!-- RG -->
             <div class="input-group">
               <label for="rg">RG</label>
-              <input type="text" name="rg" id="rg" 
-                     class="form-control" 
+              <input type="text" name="rg" id="rg"
+                     class="form-control"
                      value="{{ user.rg or '' }}">
             </div>
 
             <!-- CPF -->
             <div class="input-group">
               <label for="cpf">CPF</label>
-              <input type="text" name="cpf" id="cpf" 
-                     class="form-control" 
+              <input type="text" name="cpf" id="cpf"
+                     class="form-control"
                      value="{{ user.cpf or '' }}"
                      placeholder="000.000.000-00">
             </div>
@@ -114,8 +120,8 @@
             <!-- COREN/Conselho -->
             <div class="input-group">
               <label for="coren">COREN/Conselho</label>
-              <input type="text" name="coren" id="coren" 
-                     class="form-control" 
+              <input type="text" name="coren" id="coren"
+                     class="form-control"
                      value="{{ user.coren or '' }}">
             </div>
 
@@ -124,34 +130,31 @@
               <label for="turno">Turno de Trabalho *</label>
               <select name="turno" id="turno" class="form-control" required>
                 <option value="">Selecione o turno</option>
-                <option value="D" {% if user.turno == 'D' %}selected{% endif %}>
-                  ☀️ Diurno (07:00 - 19:00)
-                </option>
-                <option value="N" {% if user.turno == 'N' %}selected{% endif %}>
-                  🌙 Noturno (19:00 - 07:00)
-                </option>
+                <option value="D" {% if user.turno == 'D' %}selected{% endif %}>☀️ Diurno (07:00 - 19:00)</option>
+                <option value="N" {% if user.turno == 'N' %}selected{% endif %}>🌙 Noturno (19:00 - 07:00)</option>
               </select>
             </div>
 
             <!-- Setor (apenas visualização) -->
             <div class="input-group">
-              <label for="sector">Setor de Atuação</label>
+              <label>Setor de Atuação</label>
               <div class="form-control-static">
                 {{ user.sector.name if user.sector else (user.setor or 'Não definido') }}
               </div>
               <div class="form-hint">
                 <i data-lucide="shield" style="width: 12px; height: 12px;"></i>
-                A alteração de setor deve ser solicitada à Gerência
+                Alteração de setor deve ser solicitada à Gerência
               </div>
             </div>
 
-            <!-- Botões de Ação -->
+            <!-- Botões -->
             <div class="input-group full-width">
               <button type="submit" class="btn btn-primary">
                 <i data-lucide="save" style="width: 14px; height: 14px;"></i>
                 Salvar Alterações
               </button>
             </div>
+
           </div>
         </form>
       </div>
@@ -162,9 +165,10 @@
       <div class="card-header">
         <h3><i data-lucide="camera" style="width: 16px; height: 16px;"></i> Foto de Perfil</h3>
       </div>
+
       <div class="card-body">
         <div class="avatar-container">
-          <div class="avatar-preview">
+          <div class="avatar-preview" id="avatarBox">
             {% if user.foto_url %}
               <img src="{{ user.foto_url }}" alt="{{ user.nome }}" class="avatar-image" id="avatarPreview">
             {% else %}
@@ -173,33 +177,39 @@
               </div>
             {% endif %}
           </div>
-          
+
+          <!-- Upload -->
           <form method="POST" action="{{ url_for('settings.update_avatar') }}" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            
+
             <div class="avatar-actions">
               <label for="foto" class="btn btn-outline">
                 <i data-lucide="upload" style="width: 14px; height: 14px;"></i>
                 Escolher Foto
               </label>
-              <input type="file" name="foto" id="foto" accept="image/*" class="d-none" 
-                     onchange="previewImage(this)">
-              
-              {% if user.foto_url %}
-              <form method="POST" action="{{ url_for('settings.remove_avatar') }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-danger">
-                  <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
-                  Remover Foto
-                </button>
-              </form>
-              {% endif %}
+              <input type="file" name="foto" id="foto" accept="image/*" class="d-none" onchange="previewImage(this)">
+
+              <button type="submit" class="btn btn-primary">
+                <i data-lucide="save" style="width: 14px; height: 14px;"></i>
+                Salvar Foto
+              </button>
             </div>
-            
+
             <div class="form-hint mt-2">
-              <small>Formatos aceitos: JPG, PNG, GIF (Máx. 2MB)</small>
+              <small>Formatos: JPG/PNG/GIF (Máx. 2MB)</small>
             </div>
           </form>
+
+          <!-- Remover (form separado, SEM aninhar!) -->
+          {% if user.foto_url %}
+          <form method="POST" action="{{ url_for('settings.remove_avatar') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-danger">
+              <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+              Remover Foto
+            </button>
+          </form>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -209,20 +219,21 @@
       <div class="card-header">
         <h3><i data-lucide="info" style="width: 16px; height: 16px;"></i> Informações do Sistema</h3>
       </div>
+
       <div class="card-body">
         <div class="info-grid">
           <div class="info-item">
             <div class="info-label">ID do Usuário</div>
             <div class="info-value">{{ user.id }}</div>
           </div>
-          
+
           <div class="info-item">
             <div class="info-label">Perfil de Acesso</div>
             <div class="info-value">
               <span class="badge role-badge">{{ user.role_label or user.role }}</span>
             </div>
           </div>
-          
+
           <div class="info-item">
             <div class="info-label">Status da Conta</div>
             <div class="info-value">
@@ -235,394 +246,129 @@
               {% endif %}
             </div>
           </div>
-          
+
           <div class="info-item">
             <div class="info-label">Data de Cadastro</div>
             <div class="info-value">
               {{ user.created_at.strftime('%d/%m/%Y') if user.created_at else '—' }}
             </div>
           </div>
-          
+
           <div class="info-item">
             <div class="info-label">Último Acesso</div>
             <div class="info-value">
-              {{ user.last_login.strftime('%d/%m/%Y %H:%M') if user.last_login else '—' }}
+              {{ user.last_login_at.strftime('%d/%m/%Y %H:%M') if user.last_login_at else '—' }}
             </div>
           </div>
         </div>
       </div>
     </div>
+
   </div>
 </div>
 
 <style>
-.profile-wrap {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
-}
+/* (Mantive seu CSS e só deixei como estava) */
+.profile-wrap { max-width:1200px; margin:0 auto; padding:20px; }
+.grid-cards { display:grid; grid-template-columns:2fr 1fr; gap:24px; margin-top:24px; }
+@media (max-width:1024px){ .grid-cards{ grid-template-columns:1fr; } }
 
-.grid-cards {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 24px;
-  margin-top: 24px;
-}
+.card { background:var(--card-bg); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+.card-header { padding:20px 24px; border-bottom:1px solid var(--border); }
+.card-header h3 { margin:0; font-size:1.1rem; font-weight:600; display:flex; align-items:center; gap:10px; }
+.card-body { padding:24px; }
 
-@media (max-width: 1024px) {
-  .grid-cards {
-    grid-template-columns: 1fr;
-  }
-}
+.form-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:20px; }
+@media (max-width:768px){ .form-grid{ grid-template-columns:1fr; } }
+.input-group{ display:flex; flex-direction:column; gap:6px; }
+.input-group.full-width{ grid-column:1 / -1; }
 
-/* Cards */
-.card {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-}
+.input-group label{ font-size:.85rem; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; }
+.form-control{ background:#0d1117; border:1px solid var(--border); color:#fff; padding:12px; border-radius:8px; font-size:.95rem; transition:all .2s; }
+.form-control:focus{ border-color:var(--primary); outline:none; box-shadow:0 0 0 3px rgba(67,97,238,.1); }
 
-.card-header {
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--border);
-}
+.form-control-static{ background:rgba(255,255,255,.05); border:1px solid var(--border); color:#aaa; padding:12px; border-radius:8px; font-size:.95rem; }
+.form-hint{ font-size:.8rem; color:#888; margin-top:4px; }
+.form-hint i{ margin-right:4px; }
 
-.card-header h3 {
-  margin: 0;
-  font-size: 1.1rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
+.avatar-container{ display:flex; flex-direction:column; align-items:center; gap:14px; }
+.avatar-preview{ width:120px; height:120px; border-radius:50%; overflow:hidden; border:3px solid var(--border);
+  background:linear-gradient(135deg,#667eea 0%, #764ba2 100%); display:flex; align-items:center; justify-content:center; }
+.avatar-image{ width:100%; height:100%; object-fit:cover; }
+.avatar-placeholder{ width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:48px; font-weight:bold; color:white; }
+.avatar-actions{ display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+.d-none{ display:none !important; }
 
-.card-body {
-  padding: 24px;
-}
+.info-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; }
+.info-item{ padding:12px; border:1px solid rgba(255,255,255,.1); border-radius:8px; background:rgba(255,255,255,.02); }
+.info-label{ font-size:.8rem; color:var(--text-muted); margin-bottom:4px; }
+.info-value{ font-weight:500; color:#fff; font-size:.95rem; }
 
-/* Form Grid */
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 20px;
-}
+.badge{ display:inline-block; padding:4px 10px; border-radius:20px; font-size:.8rem; font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+.role-badge{ background:rgba(67,97,238,.2); color:#4361ee; border:1px solid rgba(67,97,238,.3); }
+.status-active{ background:rgba(16,185,129,.2); color:#10b981; border:1px solid rgba(16,185,129,.3); }
+.status-pending{ background:rgba(245,158,11,.2); color:#f59e0b; border:1px solid rgba(245,158,11,.3); }
+.status-blocked{ background:rgba(239,68,68,.2); color:#ef4444; border:1px solid rgba(239,68,68,.3); }
 
-@media (max-width: 768px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-}
+.btn{ padding:10px 20px; border-radius:8px; font-weight:500; font-size:.9rem; cursor:pointer; transition:all .2s;
+  border:1px solid transparent; display:inline-flex; align-items:center; gap:8px; text-decoration:none; }
+.btn-primary{ background:var(--primary); color:white; border-color:var(--primary); }
+.btn-primary:hover{ background:#3a56d4; transform:translateY(-1px); }
+.btn-outline{ background:transparent; color:#ccc; border-color:var(--border); }
+.btn-outline:hover{ background:rgba(255,255,255,.05); border-color:#555; }
+.btn-danger{ background:rgba(239,68,68,.1); color:#ef4444; border-color:rgba(239,68,68,.2); }
+.btn-danger:hover{ background:rgba(239,68,68,.2); }
 
-.input-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+.alert{ padding:12px 16px; border-radius:8px; margin-bottom:16px; display:flex; align-items:center; gap:10px; }
+.alert-success{ background:rgba(16,185,129,.1); color:#10b981; border:1px solid rgba(16,185,129,.2); }
+.alert-danger{ background:rgba(239,68,68,.1); color:#ef4444; border:1px solid rgba(239,68,68,.2); }
+.alert-info{ background:rgba(59,130,246,.1); color:#3b82f6; border:1px solid rgba(59,130,246,.2); }
 
-.input-group.full-width {
-  grid-column: 1 / -1;
-}
-
-.input-group label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.form-control {
-  background: #0d1117;
-  border: 1px solid var(--border);
-  color: #fff;
-  padding: 12px;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  transition: all 0.2s;
-}
-
-.form-control:focus {
-  border-color: var(--primary);
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
-}
-
-.form-control-static {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
-  color: #aaa;
-  padding: 12px;
-  border-radius: 8px;
-  font-size: 0.95rem;
-}
-
-.form-hint {
-  font-size: 0.8rem;
-  color: #888;
-  margin-top: 4px;
-}
-
-.form-hint i {
-  margin-right: 4px;
-}
-
-/* Avatar */
-.avatar-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-}
-
-.avatar-preview {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 3px solid var(--border);
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.avatar-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.avatar-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 48px;
-  font-weight: bold;
-  color: white;
-}
-
-.avatar-actions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.d-none {
-  display: none !important;
-}
-
-/* Informações do Sistema */
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-}
-
-.info-item {
-  padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.info-label {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  margin-bottom: 4px;
-}
-
-.info-value {
-  font-weight: 500;
-  color: #fff;
-  font-size: 0.95rem;
-}
-
-/* Badges */
-.badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.role-badge {
-  background: rgba(67, 97, 238, 0.2);
-  color: #4361ee;
-  border: 1px solid rgba(67, 97, 238, 0.3);
-}
-
-.status-active {
-  background: rgba(16, 185, 129, 0.2);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.3);
-}
-
-.status-pending {
-  background: rgba(245, 158, 11, 0.2);
-  color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.3);
-}
-
-.status-blocked {
-  background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-}
-
-/* Botões */
-.btn {
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-weight: 500;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid transparent;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  text-decoration: none;
-}
-
-.btn-primary {
-  background: var(--primary);
-  color: white;
-  border-color: var(--primary);
-}
-
-.btn-primary:hover {
-  background: #3a56d4;
-  transform: translateY(-1px);
-}
-
-.btn-outline {
-  background: transparent;
-  color: #ccc;
-  border-color: var(--border);
-}
-
-.btn-outline:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: #555;
-}
-
-.btn-danger {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-  border-color: rgba(239, 68, 68, 0.2);
-}
-
-.btn-danger:hover {
-  background: rgba(239, 68, 68, 0.2);
-}
-
-/* Alertas */
-.alert {
-  padding: 12px 16px;
-  border-radius: 8px;
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.alert-success {
-  background: rgba(16, 185, 129, 0.1);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.2);
-}
-
-.alert-danger {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.2);
-}
-
-.alert-info {
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
-  border: 1px solid rgba(59, 130, 246, 0.2);
-}
-
-/* Utilitários */
-.mt-2 {
-  margin-top: 8px;
-}
-
-.muted {
-  color: var(--text-muted);
-  font-size: 0.9rem;
-}
+.mt-2{ margin-top:8px; }
+.muted{ color:var(--text-muted); font-size:.9rem; }
 </style>
 
 <script>
 function previewImage(input) {
-  const preview = document.getElementById('avatarPreview');
-  
+  const box = document.getElementById('avatarBox');
   if (input.files && input.files[0]) {
+    const file = input.files[0];
     const reader = new FileReader();
-    
     reader.onload = function(e) {
-      if (preview.classList.contains('avatar-placeholder')) {
-        // Criar uma nova imagem
-        const img = document.createElement('img');
-        img.src = e.target.result;
-        img.className = 'avatar-image';
-        img.alt = 'Preview da foto';
-        
-        // Substituir o placeholder pela imagem
-        preview.parentNode.replaceChild(img, preview);
-        img.id = 'avatarPreview';
-      } else {
-        // Se já é uma imagem, atualizar o src
-        preview.src = e.target.result;
-      }
+      // limpa o box e injeta IMG
+      box.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = e.target.result;
+      img.className = 'avatar-image';
+      img.alt = 'Preview da foto';
+      box.appendChild(img);
     }
-    
-    reader.readAsDataURL(input.files[0]);
+    reader.readAsDataURL(file);
   }
 }
 
-// Inicializar ícones Lucide
 document.addEventListener('DOMContentLoaded', function() {
-  if (typeof lucide !== 'undefined') {
-    lucide.createIcons();
-  }
-  
-  // Validação da matrícula (apenas números)
-  const matriculaInput = document.getElementById('matricula');
-  if (matriculaInput) {
-    matriculaInput.addEventListener('input', function(e) {
-      this.value = this.value.replace(/\D/g, '');
-    });
-  }
-  
-  // Validação do CPF (formatação)
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  // CPF mask
   const cpfInput = document.getElementById('cpf');
   if (cpfInput) {
-    cpfInput.addEventListener('input', function(e) {
+    cpfInput.addEventListener('input', function() {
       let value = this.value.replace(/\D/g, '');
-      
       if (value.length <= 11) {
         value = value.replace(/(\d{3})(\d)/, '$1.$2');
         value = value.replace(/(\d{3})(\d)/, '$1.$2');
         value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
       }
-      
       this.value = value.substring(0, 14);
     });
   }
-  
-  // Validação do telefone (formatação)
+
+  // Telefone mask
   const telefoneInput = document.getElementById('telefone');
   if (telefoneInput) {
-    telefoneInput.addEventListener('input', function(e) {
+    telefoneInput.addEventListener('input', function() {
       let value = this.value.replace(/\D/g, '');
-      
       if (value.length > 10) {
         value = value.replace(/^(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
       } else if (value.length > 6) {
@@ -632,7 +378,6 @@ document.addEventListener('DOMContentLoaded', function() {
       } else if (value.length > 0) {
         value = value.replace(/^(\d*)/, '($1');
       }
-      
       this.value = value.substring(0, 15);
     });
   }

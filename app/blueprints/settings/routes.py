@@ -216,51 +216,67 @@ def profile():
 @bp.post("/profile/update")
 @login_required
 def update_profile():
-    """Atualiza os dados do perfil do usuário atual"""
     try:
-        # Campos obrigatórios
-        required_fields = ['nome', 'email', 'matricula', 'turno', 'data_nascimento']
-        for field in required_fields:
-            if field not in request.form or not request.form[field].strip():
-                flash(f'O campo {field} é obrigatório', 'danger')
-                return redirect(url_for('settings.profile'))
-        
-        # Validar e atualizar matrícula (apenas números)
-        matricula = request.form['matricula'].strip()
-        if not matricula.isdigit():
-            flash('A matrícula deve conter apenas números', 'danger')
-            return redirect(url_for('settings.profile'))
-        
-        # Atualizar campos básicos
-        current_user.nome = request.form['nome'].strip()
-        current_user.email = request.form['email'].strip()
-        current_user.matricula = matricula
-        current_user.turno = request.form['turno']
-        
-        # Validar e atualizar data de nascimento
+        nome = (request.form.get("nome") or "").strip()
+        email = (request.form.get("email") or "").strip().lower()
+        matricula = (request.form.get("matricula") or "").strip()
+        turno = (request.form.get("turno") or "").strip() or None
+        nascimento_raw = (request.form.get("data_nascimento") or "").strip()
+
+        # obrigatórios mínimos (ajuste como quiser)
+        if not nome or not email or not matricula or not turno or not nascimento_raw:
+            flash("Preencha todos os campos obrigatórios.", "danger")
+            return redirect(url_for("settings.profile"))
+
+        # matrícula: permite letras/números . _ -
+        import re
+        if not re.fullmatch(r"[A-Za-z0-9._-]{3,40}", matricula):
+            flash("Matrícula inválida. Use letras/números e . _ - (3 a 40 caracteres).", "danger")
+            return redirect(url_for("settings.profile"))
+
+        # email básico
+        if "@" not in email or "." not in email:
+            flash("E-mail inválido.", "danger")
+            return redirect(url_for("settings.profile"))
+
+        # nascimento
         try:
-            data_nascimento = datetime.strptime(
-                request.form['data_nascimento'], '%Y-%m-%d'
-            ).date()
-            current_user.data_nascimento = data_nascimento
+            nascimento = datetime.strptime(nascimento_raw, "%Y-%m-%d").date()
         except ValueError:
-            flash('Data de nascimento inválida. Use o formato AAAA-MM-DD.', 'danger')
-            return redirect(url_for('settings.profile'))
-        
-        # Campos opcionais
-        optional_fields = ['telefone', 'rg', 'cpf', 'coren']
-        for field in optional_fields:
-            if field in request.form:
-                setattr(current_user, field, request.form[field].strip() or None)
-        
+            flash("Data de nascimento inválida. Use AAAA-MM-DD.", "danger")
+            return redirect(url_for("settings.profile"))
+
+        # se matrícula/email mudarem, checa duplicidade
+        exists_m = User.query.filter(User.matricula == matricula, User.id != current_user.id).first()
+        if exists_m:
+            flash("Já existe um usuário com essa matrícula.", "danger")
+            return redirect(url_for("settings.profile"))
+
+        exists_e = User.query.filter(User.email == email, User.id != current_user.id).first()
+        if exists_e:
+            flash("Já existe um usuário com esse e-mail.", "danger")
+            return redirect(url_for("settings.profile"))
+
+        # salva no seu model real
+        current_user.nome = nome
+        current_user.email = email
+        current_user.matricula = matricula
+        current_user.turno = turno
+        current_user.nascimento = nascimento  # ✅ correto
+
+        # ✅ marca perfil completo / primeiro acesso resolvido
+        current_user.profile_completed_at = datetime.utcnow()
+        current_user.first_login = False
+
         db.session.commit()
-        flash('Perfil atualizado com sucesso!', 'success')
-        
+        flash("Perfil atualizado com sucesso!", "success")
+
     except Exception as e:
         db.session.rollback()
-        flash(f'Erro ao atualizar perfil: {str(e)}', 'danger')
-    
-    return redirect(url_for('settings.profile'))
+        flash(f"Erro ao atualizar perfil: {str(e)}", "danger")
+
+    return redirect(url_for("settings.profile"))
+
 
 
 @bp.post("/profile/avatar")

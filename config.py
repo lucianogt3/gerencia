@@ -1,23 +1,16 @@
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+ENV_PATH = BASE_DIR / ".env"
+load_dotenv(dotenv_path=ENV_PATH, override=True)
 
 class Config:
-    # Pasta raiz do projeto
-    BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+    SECRET_KEY = os.getenv("SECRET_KEY", "chave-secreta-desenvolvimento")
 
-    # Chave de seguranca
-    SECRET_KEY = "chave-secreta-desenvolvimento"
+    SQLALCHEMY_DATABASE_URI = (os.getenv("DATABASE_URL") or "").strip()
+    if not SQLALCHEMY_DATABASE_URI:
+        SQLALCHEMY_DATABASE_URI = f"sqlite:///{(BASE_DIR / 'instance' / 'app.db').as_posix()}"
 
-    # Pasta instance para o banco de dados
-    INSTANCE_DIR = os.path.join(BASE_DIR, "instance")
-    if not os.path.exists(INSTANCE_DIR):
-        os.makedirs(INSTANCE_DIR)
-        
-    # Caminho do banco SQLite
-    SQLALCHEMY_DATABASE_URI = "sqlite:///" + os.path.join(INSTANCE_DIR, "app.db").replace("\\", "/")
-    
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    
-    # Pasta de Uploads
-    UPLOAD_FOLDER = os.path.join(INSTANCE_DIR, "uploads")
-    if not os.path.exists(UPLOAD_FOLDER):
-        os.makedirs(UPLOAD_FOLDER)

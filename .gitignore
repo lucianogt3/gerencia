@@ -1,21 +1,42 @@
-# Python
+# venv / cache
 .venv/
+venv/
 __pycache__/
 *.pyc
 
-# Ambiente
+# env / secrets
 .env
 .env.*
-
-# Instance
 instance/
-instance/*.db
-instance/uploads/
+*.sqlite
+*.db
 
-# Backups e cópias
+# logs / dumps
+*.log
+db_dump.*
+db_check.*
+cookies.txt
+
+# Windows
+desktop.ini
+Thumbs.db
+
+# backups / cópias
 *.bak
-*copy*
-*.old
+*.bak_*
+* copy.*
+* copy/*
+*.tmp
 
-# Cache
-.cache/
+# scripts auxiliares (se você não quiser versionar)
+fix_*.py
+patch_*.py
+check_*.py
+repopula*.py
+popula*.py
+delete_line_*.py
+find_user_*.py
+move_user_*.py
+rebuild_*.py
+gerar_*.py
+*.ps1
